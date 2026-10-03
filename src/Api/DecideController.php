@@ -3,6 +3,7 @@
 namespace Ernestdefoe\Gatehouse\Api;
 
 use Carbon\Carbon;
+use Ernestdefoe\Gatehouse\Event\Approved;
 use Ernestdefoe\Gatehouse\Mailer;
 use Ernestdefoe\Gatehouse\Notification\ApplicantBlueprint;
 use Flarum\Http\RequestUtil;
@@ -13,6 +14,7 @@ use Laminas\Diactoros\Response\JsonResponse;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Illuminate\Contracts\Events\Dispatcher;
 use Psr\Log\LoggerInterface;
 
 /** POST /api/gatehouse/applicants/{id}/approve | decline */
@@ -22,6 +24,7 @@ class DecideController implements RequestHandlerInterface
         private Mailer $mailer,
         private NotificationSyncer $notifications,
         private LoggerInterface $log,
+        private Dispatcher $events,
     ) {
     }
 
@@ -44,6 +47,10 @@ class DecideController implements RequestHandlerInterface
         $user->gatehouse_decided_at = Carbon::now();
         $user->gatehouse_decided_by = $actor->id;
         $user->save();
+
+        if ($decision === 'approve') {
+            $this->events->dispatch(new Approved($user, $actor));
+        }
 
         // The admins' "somebody is waiting" alerts are answered now.
         $this->notifications->delete(new ApplicantBlueprint($user));
