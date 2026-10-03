@@ -13,6 +13,7 @@ Made for forums with an eligibility rule (a university, a club, a company, a pri
 - **They hear about it.** Applicants get an email saying their account is being reviewed, with any extra text you add, for example *"reply with your student ID"*. Admins get a notification and an email with a link to the queue.
 - **One click to decide.** **Approve** sends the applicant their activation link and lets them in. **Decline** emails them, and they can't sign in. A declined applicant can still be approved later.
 - **Refuse addresses outright.** A second list turns addresses away at the sign-up form, before any account is made.
+- **Reserve usernames.** Keep `admin`, `moderator` and your brand's name for yourselves.
 
 ![What a waiting member sees](screenshots/notice.png)
 
@@ -31,6 +32,12 @@ One per line, in either list:
 Lines starting with `#` are comments. **Leave the first list empty to approve every new member by hand.**
 
 ![The rules](screenshots/rules.png)
+
+## Reserved usernames
+
+A third list keeps names for staff and your brand: `admin`, `moderator`, `support`, `yourforum*`. Nobody but an admin can sign up with one, **or rename themselves to one later**, so "dave" can't become "admin" next week. Names aren't case-sensitive, and `*` works as a wildcard (`admin*` also covers `Administrator` and `admin2`).
+
+This list works on its own: you can reserve names without holding anybody for approval.
 
 ## Good to know
 

@@ -25,6 +25,9 @@ ernestdefoe-gatehouse:
     allow_help: "One per line. A domain (uni-freiburg.de, which includes its subdomains), an exact domain (@staff.example.org), an ending (.edu), a wildcard (*@example.com) or a regular expression between slashes. Everyone else waits. Leave it empty to approve every new member by hand."
     deny: Refuse these outright
     deny_help: "Same patterns. These addresses can't sign up at all, and the form says so."
+    usernames_heading: Usernames
+    reserved_usernames: Reserved usernames
+    reserved_usernames_help: "One per line. Nobody but an admin can sign up with these, or rename themselves to one later. Not case-sensitive. Use * as a wildcard (admin*, *moderator*) or a regular expression between slashes. Works whether or not sign-ups are held for approval."
     messages_heading: Emails
     held_message: Extra text for applicants who are waiting
     held_message_help: "Added to the 'we've received your application' email. Say what you need from them, for example: reply with your student ID."
@@ -33,6 +36,7 @@ ernestdefoe-gatehouse:
 
   lib:
     refused: "Sign-ups from this email address aren't accepted on this forum."
+    username_reserved: "That username isn't available. Please choose another."
     signin_pending: "Your account is waiting for an admin to approve it. We'll email you when it's ready."
     signin_declined: "This account was not approved, so it can't be used on this forum."
 

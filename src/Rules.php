@@ -56,6 +56,44 @@ class Rules
         return $this->enabled() && $this->matchesAny($this->patterns('deny'), $email);
     }
 
+    /**
+     * Whether a username is reserved: nobody but an admin may take it, at
+     * sign-up or by renaming themselves later.
+     *
+     * Independent of the approval switch: a forum can reserve "admin" without
+     * holding anybody for review.
+     *
+     * One per line: an exact name (case-insensitive), a wildcard (admin*,
+     * *moderator*), or a regular expression between slashes.
+     */
+    public function reservesUsername(string $username): bool
+    {
+        $username = mb_strtolower(trim($username));
+
+        if ($username === '') {
+            return false;
+        }
+
+        foreach ($this->patterns('reserved_usernames') as $pattern) {
+            if (strlen($pattern) > 2 && $pattern[0] === '/' && preg_match('#^/.+/[a-zA-Z]*$#s', $pattern)) {
+                if (@preg_match($pattern, $username) === 1) {
+                    return true;
+                }
+                continue;
+            }
+
+            $pattern = mb_strtolower($pattern);
+
+            if (str_contains($pattern, '*') || str_contains($pattern, '?')
+                ? fnmatch($pattern, $username, FNM_CASEFOLD)
+                : $pattern === $username) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** @return string[] */
     public function patterns(string $list): array
     {

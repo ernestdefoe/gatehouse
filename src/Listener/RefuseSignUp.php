@@ -9,9 +9,10 @@ use Flarum\User\Event\Saving;
 use Illuminate\Support\Arr;
 
 /**
- * Addresses on the refuse list cannot sign up at all. Checked while the new
- * account is being saved, so nothing is created, and the reason appears on the
- * sign-up form's email field.
+ * Addresses on the refuse list cannot sign up at all, and reserved usernames
+ * cannot be taken, at sign-up or by a rename. Checked while the account is
+ * being saved, so nothing is created, and the reason appears on the form's
+ * own field.
  */
 class RefuseSignUp
 {
@@ -21,7 +22,27 @@ class RefuseSignUp
 
     public function handle(Saving $event): void
     {
-        if ($event->user->exists || ($event->actor && $event->actor->isAdmin())) {
+        // Admins decide for themselves, including taking a reserved name.
+        if ($event->actor && $event->actor->isAdmin()) {
+            return;
+        }
+
+        /*
+         * 🚨 Renames too, not only sign-up. Otherwise anybody can register as
+         * "dave" and become "admin" next week, which is the very thing a
+         * reserved list exists to stop.
+         */
+        $username = Arr::get($event->data, 'attributes.username');
+
+        if ($username !== null
+            && (! $event->user->exists || mb_strtolower((string) $username) !== mb_strtolower((string) $event->user->getOriginal('username')))
+            && $this->rules->reservesUsername((string) $username)) {
+            throw new ValidationException([
+                'username' => $this->translator->trans('ernestdefoe-gatehouse.lib.username_reserved'),
+            ]);
+        }
+
+        if ($event->user->exists) {
             return;
         }
 
