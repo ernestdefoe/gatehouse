@@ -1,0 +1,48 @@
+{
+    "name": "ernestdefoe/gatehouse",
+    "description": "Approve new members before they get in: sign-ups from addresses you trust activate as normal, everyone else waits in a queue for an admin to approve or decline.",
+    "keywords": [
+        "flarum",
+        "flarum-extension",
+        "registration",
+        "approval",
+        "moderation",
+        "spam"
+    ],
+    "type": "flarum-extension",
+    "license": "MIT",
+    "homepage": "https://github.com/ernestdefoe/gatehouse",
+    "support": {
+        "issues": "https://github.com/ernestdefoe/gatehouse/issues",
+        "source": "https://github.com/ernestdefoe/gatehouse"
+    },
+    "authors": [
+        {
+            "name": "Ernest Defoe",
+            "email": "ernestdefoe@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "flarum/core": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Ernestdefoe\\Gatehouse\\": "src/"
+        }
+    },
+    "extra": {
+        "flarum-extension": {
+            "title": "Gatehouse",
+            "category": "moderation",
+            "icon": {
+                "name": "fas fa-dungeon",
+                "backgroundColor": "#7c4a1e",
+                "color": "#fff"
+            }
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

@@ -1,0 +1,104 @@
+.GatehouseAdmin-heading {
+  margin: 24px 0 8px;
+}
+
+// 🚨 Flarum 2's .Form-group is a flex column aligned to flex-start, which
+// shrank the queue to its widest row instead of the settings column.
+.GatehouseQueue {
+  align-self: stretch;
+  width: 100%;
+  max-width: 760px;
+}
+
+.GatehouseQueue-tabs {
+  display: inline-flex;
+  padding: 3px;
+  margin-bottom: 12px;
+  border-radius: var(--border-radius);
+  background: var(--control-bg);
+
+  button {
+    padding: 6px 14px;
+    border: 0;
+    border-radius: calc(var(--border-radius) - 2px);
+    background: transparent;
+    color: var(--control-color);
+    font-weight: 600;
+    cursor: pointer;
+
+    &.active {
+      background: var(--body-bg);
+      color: var(--text-color);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    }
+  }
+}
+
+.GatehouseQueue-count {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--primary-color);
+  color: var(--body-bg);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.GatehouseQueue-empty {
+  color: var(--muted-color);
+}
+
+.GatehouseQueue-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--control-bg);
+  border-radius: var(--border-radius);
+}
+
+.GatehouseQueue-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+
+  & + & {
+    border-top: 1px solid var(--control-bg);
+  }
+}
+
+.GatehouseQueue-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  strong,
+  .GatehouseQueue-email {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.GatehouseQueue-email,
+.GatehouseQueue-meta {
+  color: var(--muted-color);
+  font-size: 12px;
+}
+
+.GatehouseQueue-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+@media (max-width: 600px) {
+  .GatehouseQueue-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
