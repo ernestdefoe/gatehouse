@@ -9,8 +9,8 @@ use Flarum\User\Event\Saving;
 use Illuminate\Support\Arr;
 
 /**
- * Addresses on the refuse list cannot sign up at all, and reserved usernames
- * cannot be taken, at sign-up or by a rename. Checked while the account is
+ * Addresses on the refuse list cannot sign up at all or be switched to later,
+ * and reserved usernames cannot be taken, at sign-up or by a rename. Checked while the account is
  * being saved, so nothing is created, and the reason appears on the form's
  * own field.
  */
@@ -42,13 +42,17 @@ class RefuseSignUp
             ]);
         }
 
-        if ($event->user->exists) {
-            return;
-        }
+        /*
+         * 🚨 A change of address too, not only sign-up. Otherwise anybody can
+         * register with a clean address and switch to a refused one after.
+         */
+        $email = $event->user->exists
+            ? (string) Arr::get($event->data, 'attributes.email')
+            : (string) (Arr::get($event->data, 'attributes.email') ?? $event->user->email);
 
-        $email = (string) (Arr::get($event->data, 'attributes.email') ?? $event->user->email);
-
-        if ($email !== '' && $this->rules->refuses($email)) {
+        if ($email !== ''
+            && (! $event->user->exists || mb_strtolower($email) !== mb_strtolower((string) $event->user->getOriginal('email')))
+            && $this->rules->refuses($email)) {
             throw new ValidationException([
                 'email' => $this->translator->trans('ernestdefoe-gatehouse.lib.refused'),
             ]);

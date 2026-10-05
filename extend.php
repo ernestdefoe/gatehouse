@@ -8,6 +8,7 @@ use Ernestdefoe\Gatehouse\Api\DecideController;
 use Ernestdefoe\Gatehouse\Api\QueueController;
 use Ernestdefoe\Gatehouse\BlockSignIn;
 use Ernestdefoe\Gatehouse\Listener\HoldNewMember;
+use Ernestdefoe\Gatehouse\Listener\HoldOnEmailChange;
 use Ernestdefoe\Gatehouse\Listener\RefuseSignUp;
 use Ernestdefoe\Gatehouse\Notification\ApplicantBlueprint;
 use Flarum\Api\Context;
@@ -15,6 +16,7 @@ use Flarum\Api\Resource\ForumResource;
 use Flarum\Api\Schema;
 use Flarum\Extend;
 use Flarum\Group\Group;
+use Flarum\User\Event\EmailChangeRequested;
 use Flarum\User\Event\Registered;
 use Flarum\User\Event\Saving;
 use Flarum\User\User;
@@ -39,6 +41,7 @@ return [
 
     (new Extend\Event())
         ->listen(Registered::class, HoldNewMember::class)
+        ->listen(EmailChangeRequested::class, HoldOnEmailChange::class)
         ->listen(Saving::class, RefuseSignUp::class),
 
     (new Extend\Auth())

@@ -24,12 +24,17 @@ class HoldNewMember
 
     public function handle(Registered $event): void
     {
-        $user = $event->user;
-
-        if (! $this->rules->holds((string) $user->email, $event->actor)) {
-            return;
+        if ($this->rules->holds((string) $event->user->email, $event->actor)) {
+            $this->hold($event->user);
         }
+    }
 
+    /**
+     * Put a member in the queue and tell the admins. The applicant is told too,
+     * unless the address on the account may not be theirs (see HoldOnEmailChange).
+     */
+    public function hold(User $user, bool $tellApplicant = true): void
+    {
         $user->gatehouse_status = 'pending';
         $user->save();
 
@@ -39,7 +44,9 @@ class HoldNewMember
          * sign-up, so a failure here is logged and the applicant still waits.
          */
         try {
-            $this->mailer->held($user);
+            if ($tellApplicant) {
+                $this->mailer->held($user);
+            }
 
             $admins = User::query()->whereHas('groups', fn ($q) => $q->where('id', Group::ADMINISTRATOR_ID))->get();
             $this->notifications->sync(new ApplicantBlueprint($user), $admins->all());
