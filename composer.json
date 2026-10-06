@@ -13,6 +13,7 @@
     "license": "MIT",
     "homepage": "https://github.com/ernestdefoe/gatehouse",
     "support": {
+        "forum": "https://discuss.flarum.org/d/39995-gatehouse",
         "issues": "https://github.com/ernestdefoe/gatehouse/issues",
         "source": "https://github.com/ernestdefoe/gatehouse"
     },
