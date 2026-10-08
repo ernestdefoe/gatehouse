@@ -39,13 +39,13 @@ class DecideController implements RequestHandlerInterface
 
         // Only someone Gatehouse actually holds or declined can be decided on;
         // this is not a way to lock out an ordinary member.
-        if (! in_array($user->gatehouse_status, ['pending', 'declined'], true)) {
-            return new JsonResponse(['status' => $user->gatehouse_status], 409);
+        if (! in_array($user->getAttribute('gatehouse_status'), ['pending', 'declined'], true)) {
+            return new JsonResponse(['status' => $user->getAttribute('gatehouse_status')], 409);
         }
 
-        $user->gatehouse_status = $decision === 'approve' ? 'approved' : 'declined';
-        $user->gatehouse_decided_at = Carbon::now();
-        $user->gatehouse_decided_by = $actor->id;
+        $user->setAttribute('gatehouse_status', $decision === 'approve' ? 'approved' : 'declined');
+        $user->setAttribute('gatehouse_decided_at', Carbon::now());
+        $user->setAttribute('gatehouse_decided_by', $actor->id);
         $user->save();
 
         if ($decision === 'approve') {
@@ -61,6 +61,6 @@ class DecideController implements RequestHandlerInterface
             $this->log->warning('[gatehouse] decided ' . $user->id . ' but could not email them: ' . $e->getMessage());
         }
 
-        return new JsonResponse(['status' => $user->gatehouse_status]);
+        return new JsonResponse(['status' => $user->getAttribute('gatehouse_status')]);
     }
 }

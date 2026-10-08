@@ -30,7 +30,7 @@ class HoldOnEmailChange
     {
         $user = $event->user;
 
-        if ($user->is_email_confirmed || $user->gatehouse_status !== null || $user->isAdmin()) {
+        if ($user->is_email_confirmed || $user->getAttribute('gatehouse_status') !== null || $user->isAdmin()) {
             return;
         }
 

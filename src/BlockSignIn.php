@@ -22,7 +22,7 @@ class BlockSignIn
 
     public function __invoke(User $user, string $password): ?bool
     {
-        $status = $user->gatehouse_status;
+        $status = $user->getAttribute('gatehouse_status');
 
         if (! in_array($status, ['pending', 'declined'], true)) {
             return null; // No opinion: core decides.

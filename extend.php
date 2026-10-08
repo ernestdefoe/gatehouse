@@ -56,7 +56,7 @@ return [
      */
     (new Extend\User())
         ->permissionGroups(function (User $actor, array $groupIds) {
-            return in_array($actor->gatehouse_status, ['pending', 'declined'], true)
+            return in_array($actor->getAttribute('gatehouse_status'), ['pending', 'declined'], true)
                 ? [Group::GUEST_ID]
                 : $groupIds;
         }),
@@ -68,8 +68,8 @@ return [
     (new Extend\ApiResource(ForumResource::class))
         ->fields(fn () => [
             Schema\Str::make('gatehouseStatus')
-                ->get(fn ($model, Context $context) => in_array($context->getActor()->gatehouse_status, ['pending', 'declined'], true)
-                    ? $context->getActor()->gatehouse_status
+                ->get(fn ($model, Context $context) => in_array($context->getActor()->getAttribute('gatehouse_status'), ['pending', 'declined'], true)
+                    ? $context->getActor()->getAttribute('gatehouse_status')
                     : null),
         ]),
 

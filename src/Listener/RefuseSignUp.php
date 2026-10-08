@@ -23,7 +23,7 @@ class RefuseSignUp
     public function handle(Saving $event): void
     {
         // Admins decide for themselves, including taking a reserved name.
-        if ($event->actor && $event->actor->isAdmin()) {
+        if ($event->actor->isAdmin()) {
             return;
         }
 

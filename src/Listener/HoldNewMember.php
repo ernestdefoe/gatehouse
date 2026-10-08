@@ -35,7 +35,7 @@ class HoldNewMember
      */
     public function hold(User $user, bool $tellApplicant = true): void
     {
-        $user->gatehouse_status = 'pending';
+        $user->setAttribute('gatehouse_status', 'pending');
         $user->save();
 
         /*
