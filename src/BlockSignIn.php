@@ -33,7 +33,7 @@ class BlockSignIn
         }
 
         throw new ValidationException([
-            'identification' => $this->translator->trans('ernestdefoe-gatehouse.lib.signin_' . $status),
+            'identification' => $this->translator->trans('ernestdefoe-gatehouse.lib.signin_'.$status),
         ]);
     }
 }

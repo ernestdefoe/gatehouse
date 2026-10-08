@@ -61,14 +61,14 @@ class Mailer
     {
         $this->send($admin, 'admin_new', [
             'applicant' => $applicant->display_name,
-            'email'     => $applicant->email,
-            'url'       => $this->url->to('admin')->base() . '#/extension/ernestdefoe-gatehouse',
+            'email' => $applicant->email,
+            'url' => $this->url->to('admin')->base().'#/extension/ernestdefoe-gatehouse',
         ]);
     }
 
     private function custom(string $key): string
     {
-        return trim((string) $this->settings->get('ernestdefoe-gatehouse.' . $key, ''));
+        return trim((string) $this->settings->get('ernestdefoe-gatehouse.'.$key, ''));
     }
 
     private function send(User $to, string $kind, array $params): void

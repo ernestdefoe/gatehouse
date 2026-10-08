@@ -55,7 +55,7 @@ class HoldNewMember
                 $this->mailer->notifyAdmin($admin, $user);
             }
         } catch (\Throwable $e) {
-            $this->log->warning('[gatehouse] held ' . $user->id . ' but could not send every notice: ' . $e->getMessage());
+            $this->log->warning('[gatehouse] held '.$user->id.' but could not send every notice: '.$e->getMessage());
         }
     }
 }

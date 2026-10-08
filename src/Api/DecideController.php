@@ -9,12 +9,12 @@ use Ernestdefoe\Gatehouse\Notification\ApplicantBlueprint;
 use Flarum\Http\RequestUtil;
 use Flarum\Notification\NotificationSyncer;
 use Flarum\User\User;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Arr;
 use Laminas\Diactoros\Response\JsonResponse;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
-use Illuminate\Contracts\Events\Dispatcher;
 use Psr\Log\LoggerInterface;
 
 /** POST /api/gatehouse/applicants/{id}/approve | decline */
@@ -58,7 +58,7 @@ class DecideController implements RequestHandlerInterface
         try {
             $decision === 'approve' ? $this->mailer->approved($user) : $this->mailer->declined($user);
         } catch (\Throwable $e) {
-            $this->log->warning('[gatehouse] decided ' . $user->id . ' but could not email them: ' . $e->getMessage());
+            $this->log->warning('[gatehouse] decided '.$user->id.' but could not email them: '.$e->getMessage());
         }
 
         return new JsonResponse(['status' => $user->getAttribute('gatehouse_status')]);

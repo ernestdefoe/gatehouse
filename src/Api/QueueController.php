@@ -33,14 +33,14 @@ class QueueController implements RequestHandlerInterface
                 'pending' => User::query()->where('gatehouse_status', 'pending')->count(),
             ],
             'applicants' => $users->map(fn (User $u) => [
-                'id'          => (int) $u->id,
-                'username'    => $u->username,
+                'id' => (int) $u->id,
+                'username' => $u->username,
                 'displayName' => $u->display_name,
-                'email'       => $u->email,
-                'confirmed'   => (bool) $u->is_email_confirmed,
-                'joinedAt'    => optional($u->joined_at)->toIso8601String(),
-                'decidedAt'   => $u->getAttribute('gatehouse_decided_at') ? \Carbon\Carbon::parse($u->getAttribute('gatehouse_decided_at'))->toIso8601String() : null,
-                'decidedBy'   => $u->getAttribute('gatehouse_decided_by') ? $deciders->get($u->getAttribute('gatehouse_decided_by'))?->display_name : null,
+                'email' => $u->email,
+                'confirmed' => (bool) $u->is_email_confirmed,
+                'joinedAt' => optional($u->joined_at)->toIso8601String(),
+                'decidedAt' => $u->getAttribute('gatehouse_decided_at') ? \Carbon\Carbon::parse($u->getAttribute('gatehouse_decided_at'))->toIso8601String() : null,
+                'decidedBy' => $u->getAttribute('gatehouse_decided_by') ? $deciders->get($u->getAttribute('gatehouse_decided_by'))?->display_name : null,
             ])->values()->all(),
         ]);
     }

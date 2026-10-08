@@ -97,7 +97,7 @@ class Rules
     /** @return string[] */
     public function patterns(string $list): array
     {
-        $raw = (string) $this->settings->get('ernestdefoe-gatehouse.' . $list, '');
+        $raw = (string) $this->settings->get('ernestdefoe-gatehouse.'.$list, '');
         $lines = preg_split('/\R/', $raw) ?: [];
 
         return array_values(array_filter(array_map('trim', $lines), fn ($l) => $l !== '' && $l[0] !== '#'));
@@ -150,6 +150,6 @@ class Rules
 
         // A bare domain: it, or any subdomain of it — never a look-alike.
         // "example.com" must not let in "badexample.com".
-        return $domain === $pattern || str_ends_with($domain, '.' . $pattern);
+        return $domain === $pattern || str_ends_with($domain, '.'.$pattern);
     }
 }
