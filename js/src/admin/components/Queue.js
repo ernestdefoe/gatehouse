@@ -20,13 +20,11 @@ export default class Queue extends Component {
 
   load() {
     this.rows = null;
-    app
-      .request({ method: 'GET', url: app.forum.attribute('apiUrl') + '/gatehouse/queue', params: { status: this.tab } })
-      .then((r) => {
-        this.rows = r.applicants;
-        this.pending = r.counts.pending;
-        m.redraw();
-      });
+    app.request({ method: 'GET', url: app.forum.attribute('apiUrl') + '/gatehouse/queue', params: { status: this.tab } }).then((r) => {
+      this.rows = r.applicants;
+      this.pending = r.counts.pending;
+      m.redraw();
+    });
   }
 
   decide(row, decision) {
@@ -78,17 +76,33 @@ export default class Queue extends Component {
                   <span className="GatehouseQueue-meta">
                     {this.tab === 'pending'
                       ? [t('signed_up'), ' ', humanTime(row.joinedAt)]
-                      : [t(this.tab === 'approved' ? 'approved_by' : 'declined_by', { name: row.decidedBy || '?' }), ' ', row.decidedAt ? humanTime(row.decidedAt) : null]}
+                      : [
+                          t(this.tab === 'approved' ? 'approved_by' : 'declined_by', { name: row.decidedBy || '?' }),
+                          ' ',
+                          row.decidedAt ? humanTime(row.decidedAt) : null,
+                        ]}
                   </span>
                 </div>
                 <div className="GatehouseQueue-actions">
                   {this.tab !== 'approved' ? (
-                    <Button className="Button Button--primary" icon="fas fa-check" loading={this.busy[row.id] === 'approve'} disabled={!!this.busy[row.id]} onclick={() => this.decide(row, 'approve')}>
+                    <Button
+                      className="Button Button--primary"
+                      icon="fas fa-check"
+                      loading={this.busy[row.id] === 'approve'}
+                      disabled={!!this.busy[row.id]}
+                      onclick={() => this.decide(row, 'approve')}
+                    >
                       {t('approve')}
                     </Button>
                   ) : null}
                   {this.tab === 'pending' ? (
-                    <Button className="Button" icon="fas fa-xmark" loading={this.busy[row.id] === 'decline'} disabled={!!this.busy[row.id]} onclick={() => this.decide(row, 'decline')}>
+                    <Button
+                      className="Button"
+                      icon="fas fa-xmark"
+                      loading={this.busy[row.id] === 'decline'}
+                      disabled={!!this.busy[row.id]}
+                      onclick={() => this.decide(row, 'decline')}
+                    >
                       {t('decline')}
                     </Button>
                   ) : null}
