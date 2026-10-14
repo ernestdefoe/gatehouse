@@ -20,6 +20,9 @@ use Flarum\User\User;
  */
 class Rules
 {
+    /** The longest answer the sign-up question takes. */
+    public const REASON_MAX = 1000;
+
     public function __construct(private SettingsRepositoryInterface $settings)
     {
     }
@@ -48,6 +51,19 @@ class Rules
         }
 
         return ! $this->matchesAny($this->patterns('allow'), $email);
+    }
+
+    /** The question the sign-up form asks, or null when it asks none. */
+    public function question(): ?string
+    {
+        $question = trim((string) $this->settings->get('ernestdefoe-gatehouse.question', ''));
+
+        return $this->enabled() && $question !== '' ? $question : null;
+    }
+
+    public function questionRequired(): bool
+    {
+        return $this->question() !== null && (bool) $this->settings->get('ernestdefoe-gatehouse.question_required');
     }
 
     /** Whether a sign-up is refused outright. */

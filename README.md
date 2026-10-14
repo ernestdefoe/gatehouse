@@ -10,7 +10,8 @@ Made for forums with an eligibility rule (a university, a club, a company, a pri
 
 - **Trusted addresses walk straight in.** List the domains you trust, such as `.edu`, `uni-freiburg.de` or `@staff.example.org`. Those sign-ups get the normal activation email and carry on as usual.
 - **Everyone else waits.** They can sign up, but until an admin approves them they have exactly a visitor's permissions: they can read what a guest can, and post nothing. A notice at the top of the forum tells them why.
-- **They hear about it.** Applicants get an email saying their account is being reviewed, with any extra text you add, for example *"reply with your student ID"*. Admins get a notification and an email with a link to the queue.
+- **Ask them a question.** Put your own question on the sign-up form, such as *"Why would you like to join?"* or *"Your student ID?"*, optional or required. You read the answer in the queue, in your notification and in your email.
+- **They hear about it.** Applicants get an email saying their account is being reviewed, with any extra text you add, for example *"reply with your student ID"*. Admins get a notification and an email with the applicant's answer and a link to the queue; each admin can switch either off in their own notification settings.
 - **One click to decide.** **Approve** sends the applicant their activation link and lets them in. **Decline** emails them, and they can't sign in. A declined applicant can still be approved later.
 - **Refuse addresses outright.** A second list turns addresses away at the sign-up form, before any account is made.
 - **Reserve usernames.** Keep `admin`, `moderator` and your brand's name for yourselves.
@@ -45,6 +46,8 @@ This list works on its own: you can reserve names without holding anybody for ap
 - **The lock is the permissions, not the email.** Flarum signs a new member in as soon as they register, and an activation link can be requested again from the forum. So while waiting or declined, a member's permissions are those of a visitor, whatever happens with their email.
 - **No hint to strangers.** Signing in as a waiting or declined member explains why only when the password is right. With a wrong password it's Flarum's usual "incorrect" message, so the form can't be used to find out who applied.
 - **The activation link waits too.** Applicants aren't sent the activation link at sign-up; it comes with the approval, so confirming the address and being let in happen together.
+- **Only waiting addresses must answer.** A required question is never demanded of a trusted address, since they walk straight in and nobody reads it.
+- **Emails in the junk folder?** Gatehouse sends through your forum's own mail settings, like Flarum's password resets. If those land in junk too, it's the sending domain: set up SPF, DKIM and DMARC for it, send from an address on your forum's domain, or use a transactional service such as Mailgun, Postmark or Amazon SES. Admin → Email has a **Send Test Mail** section, and [mail-tester.com](https://www.mail-tester.com) scores a test message and says what to fix.
 - **Email is best-effort.** If the mail server is down, the applicant is still held; the failure is logged.
 
 ## Installation

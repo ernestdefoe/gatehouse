@@ -36,6 +36,20 @@ app.initializers.add('ernestdefoe-gatehouse', () => {
       help: t('reserved_usernames_help'),
       placeholder: 'admin*\nmoderator\nsupport\n*official*',
     })
+    .registerSetting(() => <h3 className="GatehouseAdmin-heading">{t('question_heading')}</h3>)
+    .registerSetting({
+      setting: 'ernestdefoe-gatehouse.question',
+      type: 'text',
+      label: t('question'),
+      help: t('question_help'),
+      placeholder: t('question_placeholder'),
+    })
+    .registerSetting({
+      setting: 'ernestdefoe-gatehouse.question_required',
+      type: 'boolean',
+      label: t('question_required'),
+      help: t('question_required_help'),
+    })
     .registerSetting(() => <h3 className="GatehouseAdmin-heading">{t('messages_heading')}</h3>)
     .registerSetting({ setting: 'ernestdefoe-gatehouse.held_message', type: 'textarea', label: t('held_message'), help: t('held_message_help') })
     .registerSetting({

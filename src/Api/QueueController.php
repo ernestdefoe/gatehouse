@@ -38,6 +38,7 @@ class QueueController implements RequestHandlerInterface
                 'displayName' => $u->display_name,
                 'email' => $u->email,
                 'confirmed' => (bool) $u->is_email_confirmed,
+                'reason' => $u->getAttribute('gatehouse_reason'),
                 'joinedAt' => optional($u->joined_at)->toIso8601String(),
                 'decidedAt' => $u->getAttribute('gatehouse_decided_at') ? \Carbon\Carbon::parse($u->getAttribute('gatehouse_decided_at'))->toIso8601String() : null,
                 'decidedBy' => $u->getAttribute('gatehouse_decided_by') ? $deciders->get($u->getAttribute('gatehouse_decided_by'))?->display_name : null,

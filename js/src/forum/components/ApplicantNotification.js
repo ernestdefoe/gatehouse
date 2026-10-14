@@ -15,7 +15,8 @@ export default class ApplicantNotification extends Notification {
     return app.translator.trans('ernestdefoe-gatehouse.forum.notification', { name: this.attrs.notification.fromUser()?.displayName() });
   }
 
+  // Their answer to the sign-up question, when there is one.
   excerpt() {
-    return null;
+    return this.attrs.notification.fromUser()?.attribute('gatehouseReason') || null;
   }
 }

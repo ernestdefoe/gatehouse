@@ -12,7 +12,7 @@ use Flarum\User\User;
 use Illuminate\Contracts\Queue\Queue;
 
 /**
- * The four emails Gatehouse sends, in core's own informational-email layout so
+ * The three emails Gatehouse sends the applicant, in core's own informational-email layout so
  * they look like the rest of the forum's mail.
  */
 class Mailer
@@ -54,16 +54,6 @@ class Mailer
     public function declined(User $user): void
     {
         $this->send($user, 'declined', ['message' => $this->custom('declined_message')]);
-    }
-
-    /** To each admin: somebody is waiting. */
-    public function notifyAdmin(User $admin, User $applicant): void
-    {
-        $this->send($admin, 'admin_new', [
-            'applicant' => $applicant->display_name,
-            'email' => $applicant->email,
-            'url' => $this->url->to('admin')->base().'#/extension/ernestdefoe-gatehouse',
-        ]);
     }
 
     private function custom(string $key): string

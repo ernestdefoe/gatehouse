@@ -48,12 +48,9 @@ class HoldNewMember
                 $this->mailer->held($user);
             }
 
+            // An alert and an email to each admin, as their notification settings allow.
             $admins = User::query()->whereHas('groups', fn ($q) => $q->where('id', Group::ADMINISTRATOR_ID))->get();
             $this->notifications->sync(new ApplicantBlueprint($user), $admins->all());
-
-            foreach ($admins as $admin) {
-                $this->mailer->notifyAdmin($admin, $user);
-            }
         } catch (\Throwable $e) {
             $this->log->warning('[gatehouse] held '.$user->id.' but could not send every notice: '.$e->getMessage());
         }

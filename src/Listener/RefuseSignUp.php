@@ -10,9 +10,9 @@ use Illuminate\Support\Arr;
 
 /**
  * Addresses on the refuse list cannot sign up at all or be switched to later,
- * and reserved usernames cannot be taken, at sign-up or by a rename. Checked while the account is
- * being saved, so nothing is created, and the reason appears on the form's
- * own field.
+ * reserved usernames cannot be taken, at sign-up or by a rename, and a required
+ * sign-up question must be answered. Checked while the account is being saved,
+ * so nothing is created, and the reason appears on the form's own field.
  */
 class RefuseSignUp
 {
@@ -55,6 +55,20 @@ class RefuseSignUp
             && $this->rules->refuses($email)) {
             throw new ValidationException([
                 'email' => $this->translator->trans('ernestdefoe-gatehouse.lib.refused'),
+            ]);
+        }
+
+        /*
+         * The sign-up question, when the admin made it required. Only for an
+         * address that will wait: a trusted address walks straight in, so
+         * nobody reads the answer and it is never demanded.
+         */
+        if (! $event->user->exists
+            && $this->rules->questionRequired()
+            && trim((string) Arr::get($event->data, 'attributes.gatehouseReason')) === ''
+            && $this->rules->holds($email, $event->actor)) {
+            throw new ValidationException([
+                'gatehouseReason' => $this->translator->trans('ernestdefoe-gatehouse.lib.reason_required'),
             ]);
         }
     }

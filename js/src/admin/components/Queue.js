@@ -73,6 +73,11 @@ export default class Queue extends Component {
                 <div className="GatehouseQueue-who">
                   <strong>{row.displayName}</strong>
                   <span className="GatehouseQueue-email">{row.email}</span>
+                  {row.reason ? (
+                    <blockquote className="GatehouseQueue-reason" title={t('answer')}>
+                      {row.reason}
+                    </blockquote>
+                  ) : null}
                   <span className="GatehouseQueue-meta">
                     {this.tab === 'pending'
                       ? [t('signed_up'), ' ', humanTime(row.joinedAt)]

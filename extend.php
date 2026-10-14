@@ -11,8 +11,10 @@ use Ernestdefoe\Gatehouse\Listener\HoldNewMember;
 use Ernestdefoe\Gatehouse\Listener\HoldOnEmailChange;
 use Ernestdefoe\Gatehouse\Listener\RefuseSignUp;
 use Ernestdefoe\Gatehouse\Notification\ApplicantBlueprint;
+use Ernestdefoe\Gatehouse\Rules;
 use Flarum\Api\Context;
 use Flarum\Api\Resource\ForumResource;
+use Flarum\Api\Resource\UserResource;
 use Flarum\Api\Schema;
 use Flarum\Extend;
 use Flarum\Group\Group;
@@ -31,6 +33,9 @@ return [
         ->css(__DIR__.'/less/admin.less'),
 
     new Extend\Locales(__DIR__.'/locale'),
+
+    (new Extend\View())
+        ->namespace('ernestdefoe-gatehouse', __DIR__.'/views'),
 
     (new Extend\Settings())
         ->default('ernestdefoe-gatehouse.enabled', false),
@@ -62,15 +67,36 @@ return [
         }),
 
     (new Extend\Notification())
-        ->type(ApplicantBlueprint::class, ['alert']),
+        ->type(ApplicantBlueprint::class, ['alert', 'email']),
 
-    // The signed-in member's own standing, so the forum can say "you're in the queue".
     (new Extend\ApiResource(ForumResource::class))
         ->fields(fn () => [
+            // The signed-in member's own standing, so the forum can say "you're in the queue".
             Schema\Str::make('gatehouseStatus')
                 ->get(fn ($model, Context $context) => in_array($context->getActor()->getAttribute('gatehouse_status'), ['pending', 'declined'], true)
                     ? $context->getActor()->getAttribute('gatehouse_status')
                     : null),
+            // The sign-up form's extra question, only while sign-ups are being held.
+            Schema\Str::make('gatehouseQuestion')
+                ->get(fn () => resolve(Rules::class)->question()),
+            Schema\Boolean::make('gatehouseQuestionRequired')
+                ->get(fn () => resolve(Rules::class)->questionRequired()),
+        ]),
+
+    (new Extend\ApiResource(UserResource::class))
+        ->fields(fn () => [
+            /*
+             * The applicant's answer: written once, at sign-up, and read only by
+             * admins, and only while the applicant is waiting or declined.
+             */
+            Schema\Str::make('gatehouseReason')
+                ->visible(fn (User $user, Context $context) => $context->getActor()->isAdmin()
+                    && in_array($user->getAttribute('gatehouse_status'), ['pending', 'declined'], true))
+                ->writable(fn (User $user, Context $context) => $context->creating())
+                ->nullable()
+                ->maxLength(Rules::REASON_MAX)
+                ->get(fn (User $user) => $user->getAttribute('gatehouse_reason'))
+                ->set(fn (User $user, ?string $value) => $user->setAttribute('gatehouse_reason', trim((string) $value) ?: null)),
         ]),
 
     (new Extend\Routes('api'))

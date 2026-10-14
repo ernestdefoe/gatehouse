@@ -140,10 +140,10 @@ class GatehouseTest extends TestCase
         $this->assertSame(200, $this->login('welcomed', 'too-obscure')->getStatusCode());
     }
 
-    private function register(string $username, string $email): ResponseInterface
+    private function register(string $username, string $email, array $extra = []): ResponseInterface
     {
         return $this->send($this->request('POST', '/api/users', [
-            'json' => ['data' => ['type' => 'users', 'attributes' => ['username' => $username, 'email' => $email, 'password' => 'a-long-password']]],
+            'json' => ['data' => ['type' => 'users', 'attributes' => ['username' => $username, 'email' => $email, 'password' => 'a-long-password'] + $extra]],
         ]));
     }
 
@@ -217,5 +217,109 @@ class GatehouseTest extends TestCase
         $rename = fn (int $actor) => $this->json('PATCH', '/api/users/2', $actor, ['data' => ['type' => 'users', 'id' => '2', 'attributes' => ['username' => 'admin2']]])[0];
         $this->assertSame(422, $rename(5), 'Not even by a moderator');
         $this->assertSame(200, $rename(1), 'An admin decides for themselves');
+    }
+
+    #[Test]
+    public function the_sign_up_question_is_not_asked_while_gatehouse_is_off()
+    {
+        $this->setting('ernestdefoe-gatehouse.question', 'Why join?');
+
+        $this->assertNull($this->json('GET', '/api', null)[1]['data']['attributes']['gatehouseQuestion']);
+    }
+
+    #[Test]
+    public function the_sign_up_question_is_asked_while_sign_ups_are_held()
+    {
+        $this->setting('ernestdefoe-gatehouse.enabled', '1');
+        $this->setting('ernestdefoe-gatehouse.question', 'Why join?');
+        $this->setting('ernestdefoe-gatehouse.question_required', '1');
+
+        $forum = $this->json('GET', '/api', null)[1]['data']['attributes'];
+        $this->assertSame('Why join?', $forum['gatehouseQuestion']);
+        $this->assertTrue($forum['gatehouseQuestionRequired']);
+    }
+
+    #[Test]
+    public function an_applicants_answer_is_kept_and_shown_only_to_admins()
+    {
+        $this->setting('ernestdefoe-gatehouse.enabled', '1');
+        $this->setting('ernestdefoe-gatehouse.question', 'Why join?');
+
+        $response = $this->register('student', 'kim@notuni.test', ['gatehouseReason' => "  I study here.\nCS101  "]);
+        $this->assertSame(201, $response->getStatusCode());
+        $id = json_decode((string) $response->getBody(), true)['data']['id'];
+        $this->assertArrayNotHasKey('gatehouseReason', json_decode((string) $response->getBody(), true)['data']['attributes'], 'Not echoed to a guest');
+
+        $this->assertSame("I study here.\nCS101", $this->database()->table('users')->where('id', $id)->value('gatehouse_reason'));
+
+        [, $queue] = $this->json('GET', '/api/gatehouse/queue', 1);
+        $this->assertSame("I study here.\nCS101", $queue['applicants'][0]['reason']);
+
+        $this->assertSame("I study here.\nCS101", $this->json('GET', "/api/users/$id", 1)[1]['data']['attributes']['gatehouseReason'] ?? null);
+        $this->assertArrayNotHasKey('gatehouseReason', $this->json('GET', "/api/users/$id", 2)[1]['data']['attributes'] ?? [], 'Not to an ordinary member');
+
+        $this->assertSame(422, $this->register('essay', 'e@notuni.test', ['gatehouseReason' => str_repeat('x', 1001)])->getStatusCode());
+    }
+
+    #[Test]
+    public function the_answer_cannot_be_changed_after_sign_up()
+    {
+        $this->json('PATCH', '/api/users/3', 3, ['data' => ['type' => 'users', 'id' => '3', 'attributes' => ['gatehouseReason' => 'changed']]]);
+        $this->json('PATCH', '/api/users/3', 1, ['data' => ['type' => 'users', 'id' => '3', 'attributes' => ['gatehouseReason' => 'changed']]]);
+
+        $this->assertNull($this->database()->table('users')->where('id', 3)->value('gatehouse_reason'), 'Not by the applicant, not by an admin');
+    }
+
+    #[Test]
+    public function a_required_answer_is_demanded_only_of_addresses_that_wait()
+    {
+        $this->setting('ernestdefoe-gatehouse.enabled', '1');
+        $this->setting('ernestdefoe-gatehouse.allow', 'uni.test');
+        $this->setting('ernestdefoe-gatehouse.question', 'Your student ID?');
+        $this->setting('ernestdefoe-gatehouse.question_required', '1');
+
+        $this->assertSame(422, $this->register('blank', 'kim@notuni.test', ['gatehouseReason' => '   '])->getStatusCode());
+        $this->assertSame(422, $this->register('missing', 'lee@notuni.test')->getStatusCode());
+        $this->assertSame(0, $this->database()->table('users')->whereIn('username', ['blank', 'missing'])->count());
+
+        $this->assertSame(201, $this->register('answered', 'kim@notuni.test', ['gatehouseReason' => '12345'])->getStatusCode());
+        $this->assertSame(201, $this->register('trusted', 'kim@cs.uni.test')->getStatusCode(), 'A trusted address never has to answer');
+    }
+
+    #[Test]
+    public function admins_are_emailed_through_their_notification_settings()
+    {
+        $this->setting('ernestdefoe-gatehouse.enabled', '1');
+
+        $this->prepareDatabase([
+            User::class => [['id' => 8, 'username' => 'quietadmin', 'email' => 'quiet@machine.local', 'is_email_confirmed' => 1, 'preferences' => json_encode(['notify_gatehouseApplicant_email' => false])]],
+            'group_user' => [['user_id' => 8, 'group_id' => 1]],
+        ]);
+
+        $this->register('stranger', 'kim@notuni.test');
+
+        $this->assertTrue(User::find(1)->shouldEmail('gatehouseApplicant'), 'Email is on by default');
+        $this->assertFalse(User::find(8)->shouldEmail('gatehouseApplicant'));
+        $this->assertSame(2, $this->database()->table('notifications')->where('type', 'gatehouseApplicant')->count(), 'Both admins get the alert');
+    }
+
+    #[Test]
+    public function the_admin_email_carries_the_answer_safely()
+    {
+        // The test forum's mail driver writes each message to the log.
+        $log = fn () => implode('', array_map('file_get_contents', glob($this->tmpDir().'/storage/logs/*.log') ?: []));
+        $before = strlen($log());
+
+        $this->setting('ernestdefoe-gatehouse.enabled', '1');
+        $this->setting('ernestdefoe-gatehouse.question', 'Why join?');
+
+        $this->register('stranger', 'kim@notuni.test', ['gatehouseReason' => '<b>Me & you</b>']);
+
+        $mail = quoted_printable_decode(substr($log(), $before));
+        $this->assertStringContainsString('To: admin <admin@machine.local>', $mail);
+        $this->assertStringContainsString('List-Unsubscribe:', $mail, 'An ordinary notification email, with an unsubscribe link');
+        $this->assertStringContainsString('&lt;b&gt;Me &amp; you&lt;/b&gt;', $mail, 'The answer is escaped in the HTML part');
+        $this->assertStringNotContainsString('<blockquote style="white-space: pre-line"><b>', $mail);
+        $this->assertStringContainsString('#/extension/ernestdefoe-gatehouse', $mail);
     }
 }
