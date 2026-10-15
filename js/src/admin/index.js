@@ -34,7 +34,7 @@ app.initializers.add('ernestdefoe-gatehouse', () => {
       type: 'textarea',
       label: t('reserved_usernames'),
       help: t('reserved_usernames_help'),
-      placeholder: 'admin*\nmoderator\nsupport\n*official*',
+      placeholder: t('reserved_usernames_placeholder'),
     })
     .registerSetting(() => <h3 className="GatehouseAdmin-heading">{t('question_heading')}</h3>)
     .registerSetting({
