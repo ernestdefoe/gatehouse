@@ -1,6 +1,6 @@
 {
     "name": "ernestdefoe/gatehouse",
-    "description": "Approve new members before they get in: sign-ups from addresses you trust activate as normal, everyone else waits in a queue for an admin to approve or decline.",
+    "description": "Approve new members before they get in: sign-ups from addresses you trust activate as normal, everyone else waits in a queue for an admin or moderator to approve or decline.",
     "keywords": [
         "flarum",
         "flarum-extension",

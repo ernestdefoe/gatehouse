@@ -1,14 +1,14 @@
 import app from 'flarum/forum/app';
 import Notification from 'flarum/forum/components/Notification';
 
-/** "{name} signed up and is waiting for approval" — links to the queue in the admin panel. */
+/** "{name} signed up and is waiting for approval" — links to the forum's queue page. */
 export default class ApplicantNotification extends Notification {
   icon() {
     return 'fas fa-dungeon';
   }
 
   href() {
-    return app.forum.attribute('adminUrl') + '#/extension/ernestdefoe-gatehouse';
+    return app.route('gatehouse.applicants');
   }
 
   content() {

@@ -1,11 +1,13 @@
 import app from 'flarum/admin/app';
-import Queue from './components/Queue';
+import Queue from '../common/components/Queue';
 
 const t = (key, params) => app.translator.trans(`ernestdefoe-gatehouse.admin.${key}`, params);
 
 app.initializers.add('ernestdefoe-gatehouse', () => {
   app.registry
     .for('ernestdefoe-gatehouse')
+    // Admins always have it. Give it to Moderators (or any group) to share the queue.
+    .registerPermission({ icon: 'fas fa-dungeon', label: t('permission_decide'), permission: 'ernestdefoe-gatehouse.decide' }, 'moderate', 90)
     .registerSetting(() => (
       <div className="Form-group">
         <h3 className="GatehouseAdmin-heading">{t('queue_heading')}</h3>

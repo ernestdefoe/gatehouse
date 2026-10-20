@@ -1,6 +1,6 @@
 # Gatehouse
 
-Approve new members before they get in. Sign-ups from addresses you trust activate as normal; everyone else waits in a queue until an admin approves or declines them.
+Approve new members before they get in. Sign-ups from addresses you trust activate as normal; everyone else waits in a queue until an admin or moderator approves or declines them.
 
 Made for forums with an eligibility rule (a university, a club, a company, a private group), and just as useful against a wave of spam sign-ups.
 
@@ -9,9 +9,10 @@ Made for forums with an eligibility rule (a university, a club, a company, a pri
 ## How it works
 
 - **Trusted addresses walk straight in.** List the domains you trust, such as `.edu`, `uni-freiburg.de` or `@staff.example.org`. Those sign-ups get the normal activation email and carry on as usual.
-- **Everyone else waits.** They can sign up, but until an admin approves them they have exactly a visitor's permissions: they can read what a guest can, and post nothing. A notice at the top of the forum tells them why.
+- **Everyone else waits.** They can sign up, but until they are approved they have exactly a visitor's permissions: they can read what a guest can, and post nothing. A notice at the top of the forum tells them why.
 - **Ask them a question.** Put your own question on the sign-up form, such as *"Why would you like to join?"* or *"Your student ID?"*, optional or required. You read the answer in the queue, in your notification and in your email.
-- **They hear about it.** Applicants get an email saying their account is being reviewed, with any extra text you add, for example *"reply with your student ID"*. Admins get a notification and an email with the applicant's answer and a link to the queue; each admin can switch either off in their own notification settings.
+- **They hear about it.** Applicants get an email saying their account is being reviewed, with any extra text you add, for example *"reply with your student ID"*. Everyone who decides gets a notification and an email with the applicant's answer and a link to the queue; each of them can switch either off in their own notification settings.
+- **Share the queue with moderators.** Give a group **Approve and decline applicants** in Admin → Permissions (Moderate section). They get an **Applicants** page on the forum, linked from their user menu and, while someone is waiting, the sidebar with a count. They see each applicant's username, email, sign-up date and answer, and who approved or declined whom. Admins always have it. A moderator can only decide on waiting or declined applicants, never lock out an existing member or an admin.
 - **One click to decide.** **Approve** sends the applicant their activation link and lets them in. **Decline** emails them, and they can't sign in. A declined applicant can still be approved later.
 - **Refuse addresses outright.** A second list turns addresses away at the sign-up form, before any account is made.
 - **Reserve usernames.** Keep `admin`, `moderator` and your brand's name for yourselves.

@@ -52,7 +52,7 @@ class GatehouseTest extends TestCase
     }
 
     #[Test]
-    public function the_queue_is_for_admins()
+    public function the_queue_is_for_admins_and_whoever_may_decide()
     {
         $this->assertSame(403, $this->json('GET', '/api/gatehouse/queue', null)[0]);
         $this->assertSame(403, $this->json('GET', '/api/gatehouse/queue', 2)[0]);
@@ -320,6 +320,94 @@ class GatehouseTest extends TestCase
         $this->assertStringContainsString('List-Unsubscribe:', $mail, 'An ordinary notification email, with an unsubscribe link');
         $this->assertStringContainsString('&lt;b&gt;Me &amp; you&lt;/b&gt;', $mail, 'The answer is escaped in the HTML part');
         $this->assertStringNotContainsString('<blockquote style="white-space: pre-line"><b>', $mail);
-        $this->assertStringContainsString('#/extension/ernestdefoe-gatehouse', $mail);
+        $this->assertStringContainsString('/applicants', $mail, 'Links to the forum queue, which moderators can open');
+    }
+
+    /** User 10 moderates, and the Mods group may approve and decline. */
+    private function moderatorWhoDecides(): void
+    {
+        $this->prepareDatabase([
+            User::class => [['id' => 10, 'username' => 'gatekeeper', 'email' => 'gatekeeper@machine.local', 'is_email_confirmed' => 1]],
+            'group_user' => [['user_id' => 10, 'group_id' => 4]],
+            'group_permission' => [['group_id' => 4, 'permission' => 'ernestdefoe-gatehouse.decide']],
+        ]);
+    }
+
+    #[Test]
+    public function a_moderator_with_the_permission_works_the_queue()
+    {
+        $this->moderatorWhoDecides();
+
+        [$status, $body] = $this->json('GET', '/api/gatehouse/queue', 10);
+        $this->assertSame(200, $status);
+        $this->assertSame(['alsowaiting', 'waiting'], array_column($body['applicants'], 'username'));
+        $this->assertSame('waiting@machine.local', $body['applicants'][1]['email'], 'The address, to decide with');
+
+        $this->assertSame(200, $this->json('POST', '/api/gatehouse/applicants/3/approve', 10)[0]);
+        $this->assertSame('approved', $this->gatehouseStatus(3));
+        $this->assertEquals(10, $this->database()->table('users')->where('id', 3)->value('gatehouse_decided_by'));
+
+        $this->assertSame(200, $this->json('POST', '/api/gatehouse/applicants/6/decline', 10)[0]);
+        $this->assertSame('declined', $this->gatehouseStatus(6));
+
+        [, $approved] = $this->json('GET', '/api/gatehouse/queue', 10, [], ['status' => 'approved']);
+        $this->assertSame('gatekeeper', array_column($approved['applicants'], 'decidedBy', 'username')['waiting']);
+        $this->assertSame([null], array_unique(array_column($approved['applicants'], 'email')), 'An approved member is a member: their address is for admins');
+    }
+
+    #[Test]
+    public function a_member_without_the_permission_cannot_see_or_decide()
+    {
+        $this->moderatorWhoDecides();
+
+        $this->assertSame(403, $this->json('GET', '/api/gatehouse/queue', 2)[0]);
+        $this->assertSame(403, $this->json('POST', '/api/gatehouse/applicants/3/approve', 2)[0]);
+        $this->assertSame(403, $this->json('POST', '/api/gatehouse/applicants/3/decline', 2)[0]);
+        $this->assertSame(403, $this->json('GET', '/api/gatehouse/queue', null)[0]);
+        $this->assertSame('pending', $this->gatehouseStatus(3));
+
+        $forum = fn (?int $actor) => $this->json('GET', '/api', $actor)[1]['data']['attributes'];
+        $this->assertArrayNotHasKey('gatehousePending', $forum(2));
+        $this->assertArrayNotHasKey('gatehousePending', $forum(null));
+        $this->assertSame(2, $forum(10)['gatehousePending']);
+        $this->assertSame(2, $forum(1)['gatehousePending']);
+
+        $this->assertArrayNotHasKey('gatehouseReason', $this->json('GET', '/api/users/3', 2)[1]['data']['attributes']);
+        $this->assertArrayHasKey('gatehouseReason', $this->json('GET', '/api/users/3', 10)[1]['data']['attributes']);
+    }
+
+    #[Test]
+    public function a_moderator_cannot_lock_out_a_member_or_an_admin()
+    {
+        $this->moderatorWhoDecides();
+        $this->prepareDatabase(['group_user' => [['user_id' => 6, 'group_id' => 1]]]);
+
+        $this->assertSame(409, $this->json('POST', '/api/gatehouse/applicants/2/decline', 10)[0], 'A confirmed member is not an applicant');
+        $this->assertNull($this->gatehouseStatus(2));
+
+        $this->assertSame(403, $this->json('POST', '/api/gatehouse/applicants/6/decline', 10)[0], 'A waiting admin is an admin\'s call');
+        $this->assertSame('pending', $this->gatehouseStatus(6));
+    }
+
+    #[Test]
+    public function everyone_who_may_decide_is_told_about_a_new_applicant()
+    {
+        $this->moderatorWhoDecides();
+        $this->setting('ernestdefoe-gatehouse.enabled', '1');
+        $this->prepareDatabase([
+            // A waiting moderator has a guest's permissions, so is not told.
+            'group_user' => [['user_id' => 3, 'group_id' => 4]],
+            // Granting it to Members does not alert the whole forum.
+            'group_permission' => [['group_id' => 3, 'permission' => 'ernestdefoe-gatehouse.decide']],
+        ]);
+
+        $this->register('stranger', 'kim@notuni.test');
+
+        $told = $this->database()->table('notifications')->where('type', 'gatehouseApplicant')->orderBy('user_id')->pluck('user_id')->map(fn ($id) => (int) $id)->all();
+        $this->assertSame([1, 10], $told);
+
+        $applicant = (int) $this->database()->table('users')->where('username', 'stranger')->value('id');
+        $this->json('POST', "/api/gatehouse/applicants/$applicant/approve", 10);
+        $this->assertSame(0, $this->database()->table('notifications')->where('type', 'gatehouseApplicant')->where('is_deleted', 0)->count(), 'Deciding clears it for everyone');
     }
 }

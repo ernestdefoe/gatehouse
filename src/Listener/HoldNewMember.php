@@ -2,16 +2,16 @@
 
 namespace Ernestdefoe\Gatehouse\Listener;
 
+use Ernestdefoe\Gatehouse\Deciders;
 use Ernestdefoe\Gatehouse\Mailer;
 use Ernestdefoe\Gatehouse\Notification\ApplicantBlueprint;
 use Ernestdefoe\Gatehouse\Rules;
-use Flarum\Group\Group;
 use Flarum\Notification\NotificationSyncer;
 use Flarum\User\Event\Registered;
 use Flarum\User\User;
 use Psr\Log\LoggerInterface;
 
-/** A new sign-up that the rules hold: mark it, tell the applicant, tell the admins. */
+/** A new sign-up that the rules hold: mark it, tell the applicant, tell whoever decides. */
 class HoldNewMember
 {
     public function __construct(
@@ -30,7 +30,7 @@ class HoldNewMember
     }
 
     /**
-     * Put a member in the queue and tell the admins. The applicant is told too,
+     * Put a member in the queue and tell whoever decides. The applicant is told too,
      * unless the address on the account may not be theirs (see HoldOnEmailChange).
      */
     public function hold(User $user, bool $tellApplicant = true): void
@@ -48,9 +48,8 @@ class HoldNewMember
                 $this->mailer->held($user);
             }
 
-            // An alert and an email to each admin, as their notification settings allow.
-            $admins = User::query()->whereHas('groups', fn ($q) => $q->where('id', Group::ADMINISTRATOR_ID))->get();
-            $this->notifications->sync(new ApplicantBlueprint($user), $admins->all());
+            // An alert and an email to everyone who may decide, as each one's notification settings allow.
+            $this->notifications->sync(new ApplicantBlueprint($user), Deciders::query()->get()->all());
         } catch (\Throwable $e) {
             $this->log->warning('[gatehouse] held '.$user->id.' but could not send every notice: '.$e->getMessage());
         }

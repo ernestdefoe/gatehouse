@@ -1,13 +1,16 @@
-import app from 'flarum/admin/app';
+import app from 'flarum/common/app';
 import Component from 'flarum/common/Component';
 import Button from 'flarum/common/components/Button';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
 import humanTime from 'flarum/common/helpers/humanTime';
 
-const t = (key, params) => app.translator.trans(`ernestdefoe-gatehouse.admin.queue.${key}`, params);
+const t = (key, params) => app.translator.trans(`ernestdefoe-gatehouse.lib.queue.${key}`, params);
 const TABS = ['pending', 'declined', 'approved'];
 
-/** The applicants: waiting, declined and recently approved, with Approve / Decline. */
+/**
+ * The applicants: waiting, declined and recently approved, with Approve / Decline.
+ * Shared by the admin panel and the forum's /applicants page.
+ */
 export default class Queue extends Component {
   oninit(vnode) {
     super.oninit(vnode);
@@ -22,9 +25,16 @@ export default class Queue extends Component {
     this.rows = null;
     app.request({ method: 'GET', url: app.forum.attribute('apiUrl') + '/gatehouse/queue', params: { status: this.tab } }).then((r) => {
       this.rows = r.applicants;
-      this.pending = r.counts.pending;
+      this.setPending(r.counts.pending);
       m.redraw();
     });
+  }
+
+  // Keeps the forum's badge in step with the queue.
+  setPending(count) {
+    this.pending = count;
+    const attrs = app.forum?.data.attributes;
+    if (attrs && attrs.gatehousePending != null) attrs.gatehousePending = count;
   }
 
   decide(row, decision) {
@@ -33,7 +43,7 @@ export default class Queue extends Component {
       .request({ method: 'POST', url: `${app.forum.attribute('apiUrl')}/gatehouse/applicants/${row.id}/${decision}` })
       .then(() => {
         this.rows = this.rows.filter((r) => r.id !== row.id);
-        if (this.tab === 'pending') this.pending = Math.max(0, this.pending - 1);
+        if (this.tab === 'pending') this.setPending(Math.max(0, this.pending - 1));
       })
       .finally(() => {
         delete this.busy[row.id];
@@ -72,7 +82,8 @@ export default class Queue extends Component {
               <li className="GatehouseQueue-row" key={row.id}>
                 <div className="GatehouseQueue-who">
                   <strong>{row.displayName}</strong>
-                  <span className="GatehouseQueue-email">{row.email}</span>
+                  <span className="GatehouseQueue-username">@{row.username}</span>
+                  {row.email ? <span className="GatehouseQueue-email">{row.email}</span> : null}
                   {row.reason ? (
                     <blockquote className="GatehouseQueue-reason" title={t('answer')}>
                       {row.reason}

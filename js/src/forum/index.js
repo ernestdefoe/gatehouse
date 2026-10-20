@@ -3,14 +3,42 @@ import { extend } from 'flarum/common/extend';
 import Notices from 'flarum/forum/components/Notices';
 import Alert from 'flarum/common/components/Alert';
 import Stream from 'flarum/common/utils/Stream';
+import LinkButton from 'flarum/common/components/LinkButton';
 import ApplicantNotification from './components/ApplicantNotification';
+import ApplicantsPage from './components/ApplicantsPage';
+
+// Present only for those who may approve and decline (see extend.php).
+const pending = () => app.forum.attribute('gatehousePending');
+
+const queueLink = (count) => (
+  <LinkButton icon="fas fa-dungeon" href={app.route('gatehouse.applicants')}>
+    {app.translator.trans('ernestdefoe-gatehouse.forum.applicants.link')}
+    {count ? <span className="GatehouseQueue-count">{count}</span> : null}
+  </LinkButton>
+);
 
 app.initializers.add('ernestdefoe-gatehouse', () => {
   app.notificationComponents.gatehouseApplicant = ApplicantNotification;
 
-  // Admins choose how they hear about applicants, like any other notification.
+  /*
+   * Bundled, not lazy: measured, webpack's chunk loader (~4 KB) costs every
+   * visitor more than the page itself does (forum.js 2.23 KB gz bundled vs
+   * 2.59 KB gz with the page split out).
+   */
+  app.routes['gatehouse.applicants'] = { path: '/applicants', component: ApplicantsPage };
+
+  extend('flarum/forum/components/SessionDropdown', 'items', function (items) {
+    if (pending() != null) items.add('gatehouseApplicants', queueLink(pending()), 60);
+  });
+
+  // In the sidebar only while somebody is waiting.
+  extend('flarum/forum/components/IndexSidebar', 'navItems', function (items) {
+    if (pending()) items.add('gatehouseApplicants', queueLink(pending()), 85);
+  });
+
+  // Whoever decides chooses how they hear about applicants, like any other notification.
   extend('flarum/forum/components/NotificationGrid', 'notificationTypes', function (items) {
-    if (!app.session.user?.isAdmin()) return;
+    if (pending() == null) return;
 
     items.add('gatehouseApplicant', {
       name: 'gatehouseApplicant',

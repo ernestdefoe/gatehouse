@@ -7,6 +7,6 @@
             <p><strong>{{ $question ? $translator->trans('ernestdefoe-gatehouse.email.admin_new.answer_to', ['question' => $question]) : $translator->trans('ernestdefoe-gatehouse.email.admin_new.answer') }}</strong></p>
             <blockquote style="white-space: pre-line">{{ $reason }}</blockquote>
         @endif
-        <p><a href="{{ $url->to('admin')->base() }}#/extension/ernestdefoe-gatehouse">{{ $translator->trans('ernestdefoe-gatehouse.email.admin_new.button') }}</a></p>
+        <p><a href="{{ $url->to('forum')->route('gatehouse.applicants') }}">{{ $translator->trans('ernestdefoe-gatehouse.email.admin_new.button') }}</a></p>
     </x-slot:body>
 </x-mail::html.notification>

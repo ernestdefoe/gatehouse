@@ -3,6 +3,7 @@
 namespace Ernestdefoe\Gatehouse\Api;
 
 use Carbon\Carbon;
+use Ernestdefoe\Gatehouse\Deciders;
 use Ernestdefoe\Gatehouse\Event\Approved;
 use Ernestdefoe\Gatehouse\Mailer;
 use Ernestdefoe\Gatehouse\Notification\ApplicantBlueprint;
@@ -31,7 +32,7 @@ class DecideController implements RequestHandlerInterface
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
         $actor = RequestUtil::getActor($request);
-        $actor->assertAdmin();
+        $actor->assertCan(Deciders::PERMISSION);
 
         $params = ($request->getAttribute('routeParameters') ?? []) + $request->getQueryParams();
         $decision = Arr::get($params, 'decision');
@@ -43,6 +44,11 @@ class DecideController implements RequestHandlerInterface
             return new JsonResponse(['status' => $user->getAttribute('gatehouse_status')], 409);
         }
 
+        // Somebody an admin has already put in the admin group is an admin's call.
+        if ($user->isAdmin() && ! $actor->isAdmin()) {
+            return new JsonResponse(['status' => $user->getAttribute('gatehouse_status')], 403);
+        }
+
         $user->setAttribute('gatehouse_status', $decision === 'approve' ? 'approved' : 'declined');
         $user->setAttribute('gatehouse_decided_at', Carbon::now());
         $user->setAttribute('gatehouse_decided_by', $actor->id);
@@ -52,7 +58,7 @@ class DecideController implements RequestHandlerInterface
             $this->events->dispatch(new Approved($user, $actor));
         }
 
-        // The admins' "somebody is waiting" alerts are answered now.
+        // Everyone's "somebody is waiting" alerts are answered now.
         $this->notifications->delete(new ApplicantBlueprint($user));
 
         try {

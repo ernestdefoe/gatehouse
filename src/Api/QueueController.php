@@ -2,6 +2,7 @@
 
 namespace Ernestdefoe\Gatehouse\Api;
 
+use Ernestdefoe\Gatehouse\Deciders;
 use Flarum\Http\RequestUtil;
 use Flarum\User\User;
 use Illuminate\Support\Arr;
@@ -15,7 +16,8 @@ class QueueController implements RequestHandlerInterface
 {
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
-        RequestUtil::getActor($request)->assertAdmin();
+        $actor = RequestUtil::getActor($request);
+        $actor->assertCan(Deciders::PERMISSION);
 
         $status = Arr::get($request->getQueryParams(), 'status', 'pending');
         $status = in_array($status, ['pending', 'declined', 'approved'], true) ? $status : 'pending';
@@ -25,6 +27,13 @@ class QueueController implements RequestHandlerInterface
             ->orderByDesc($status === 'pending' ? 'joined_at' : 'gatehouse_decided_at')
             ->limit(200)
             ->get();
+
+        /*
+         * The address and the answer are there to decide with. Once somebody is
+         * approved they are an ordinary member, and only an admin sees an
+         * ordinary member's address, so the history keeps those to admins.
+         */
+        $private = $status !== 'approved' || $actor->isAdmin();
 
         $deciders = User::query()->whereIn('id', $users->pluck('gatehouse_decided_by')->filter()->unique())->get()->keyBy('id');
 
@@ -36,9 +45,9 @@ class QueueController implements RequestHandlerInterface
                 'id' => (int) $u->id,
                 'username' => $u->username,
                 'displayName' => $u->display_name,
-                'email' => $u->email,
+                'email' => $private ? $u->email : null,
                 'confirmed' => (bool) $u->is_email_confirmed,
-                'reason' => $u->getAttribute('gatehouse_reason'),
+                'reason' => $private ? $u->getAttribute('gatehouse_reason') : null,
                 'joinedAt' => optional($u->joined_at)->toIso8601String(),
                 'decidedAt' => $u->getAttribute('gatehouse_decided_at') ? \Carbon\Carbon::parse($u->getAttribute('gatehouse_decided_at'))->toIso8601String() : null,
                 'decidedBy' => $u->getAttribute('gatehouse_decided_by') ? $deciders->get($u->getAttribute('gatehouse_decided_by'))?->display_name : null,

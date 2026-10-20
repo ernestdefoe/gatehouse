@@ -7,6 +7,7 @@
 use Ernestdefoe\Gatehouse\Api\DecideController;
 use Ernestdefoe\Gatehouse\Api\QueueController;
 use Ernestdefoe\Gatehouse\BlockSignIn;
+use Ernestdefoe\Gatehouse\Deciders;
 use Ernestdefoe\Gatehouse\Listener\HoldNewMember;
 use Ernestdefoe\Gatehouse\Listener\HoldOnEmailChange;
 use Ernestdefoe\Gatehouse\Listener\RefuseSignUp;
@@ -26,7 +27,9 @@ use Flarum\User\User;
 return [
     (new Extend\Frontend('forum'))
         ->js(__DIR__.'/js/dist/forum.js')
-        ->css(__DIR__.'/less/forum.less'),
+        ->css(__DIR__.'/less/forum.less')
+        // The queue, for everyone who may decide.
+        ->route('/applicants', 'gatehouse.applicants'),
 
     (new Extend\Frontend('admin'))
         ->js(__DIR__.'/js/dist/admin.js')
@@ -76,6 +79,15 @@ return [
                 ->get(fn ($model, Context $context) => in_array($context->getActor()->getAttribute('gatehouse_status'), ['pending', 'declined'], true)
                     ? $context->getActor()->getAttribute('gatehouse_status')
                     : null),
+            /*
+             * How many are waiting, and so whether to show the queue at all: only
+             * for those who may decide. Everyone else's permissions are already
+             * loaded for the page, so this costs them nothing; a decider pays one
+             * count on an indexed column.
+             */
+            Schema\Integer::make('gatehousePending')
+                ->visible(fn ($model, Context $context) => $context->getActor()->hasPermission(Deciders::PERMISSION))
+                ->get(fn () => User::query()->where('gatehouse_status', 'pending')->count()),
             // The sign-up form's extra question, only while sign-ups are being held.
             Schema\Str::make('gatehouseQuestion')
                 ->get(fn () => resolve(Rules::class)->question()),
@@ -87,10 +99,10 @@ return [
         ->fields(fn () => [
             /*
              * The applicant's answer: written once, at sign-up, and read only by
-             * admins, and only while the applicant is waiting or declined.
+             * those who may decide, and only while the applicant is waiting or declined.
              */
             Schema\Str::make('gatehouseReason')
-                ->visible(fn (User $user, Context $context) => $context->getActor()->isAdmin()
+                ->visible(fn (User $user, Context $context) => $context->getActor()->hasPermission(Deciders::PERMISSION)
                     && in_array($user->getAttribute('gatehouse_status'), ['pending', 'declined'], true))
                 ->writable(fn (User $user, Context $context) => $context->creating())
                 ->nullable()

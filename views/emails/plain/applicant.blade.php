@@ -10,6 +10,6 @@
 {!! $reason !!}
 
 @endif
-{!! $translator->trans('ernestdefoe-gatehouse.email.admin_new.button') !!}: {{ $url->to('admin')->base() }}#/extension/ernestdefoe-gatehouse
+{!! $translator->trans('ernestdefoe-gatehouse.email.admin_new.button') !!}: {{ $url->to('forum')->route('gatehouse.applicants') }}
 </x-slot:body>
 </x-mail::plain.notification>
