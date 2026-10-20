@@ -6,7 +6,7 @@ import Queue from '../../common/components/Queue';
 
 const t = (key) => app.translator.trans(`ernestdefoe-gatehouse.forum.applicants.${key}`);
 
-/** /applicants: the queue, for everyone who may approve and decline. */
+/** /gatehouse: the queue, for everyone who may approve and decline. */
 export default class ApplicantsPage extends Page {
   oninit(vnode) {
     super.oninit(vnode);

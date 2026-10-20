@@ -9,7 +9,7 @@ const TABS = ['pending', 'declined', 'approved'];
 
 /**
  * The applicants: waiting, declined and recently approved, with Approve / Decline.
- * Shared by the admin panel and the forum's /applicants page.
+ * Shared by the admin panel and the forum's /gatehouse page.
  */
 export default class Queue extends Component {
   oninit(vnode) {

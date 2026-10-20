@@ -25,7 +25,7 @@ app.initializers.add('ernestdefoe-gatehouse', () => {
    * visitor more than the page itself does (forum.js 2.23 KB gz bundled vs
    * 2.59 KB gz with the page split out).
    */
-  app.routes['gatehouse.applicants'] = { path: '/applicants', component: ApplicantsPage };
+  app.routes['gatehouse.applicants'] = { path: '/gatehouse', component: ApplicantsPage };
 
   extend('flarum/forum/components/SessionDropdown', 'items', function (items) {
     if (pending() != null) items.add('gatehouseApplicants', queueLink(pending()), 60);

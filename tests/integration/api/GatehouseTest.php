@@ -320,7 +320,8 @@ class GatehouseTest extends TestCase
         $this->assertStringContainsString('List-Unsubscribe:', $mail, 'An ordinary notification email, with an unsubscribe link');
         $this->assertStringContainsString('&lt;b&gt;Me &amp; you&lt;/b&gt;', $mail, 'The answer is escaped in the HTML part');
         $this->assertStringNotContainsString('<blockquote style="white-space: pre-line"><b>', $mail);
-        $this->assertStringContainsString('/applicants', $mail, 'Links to the forum queue, which moderators can open');
+        $this->assertStringContainsString('/gatehouse', $mail, 'Links to the forum queue, which moderators can open');
+        $this->assertStringNotContainsString('#/extension/', $mail);
     }
 
     /** User 10 moderates, and the Mods group may approve and decline. */

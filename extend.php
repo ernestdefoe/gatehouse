@@ -28,8 +28,12 @@ return [
     (new Extend\Frontend('forum'))
         ->js(__DIR__.'/js/dist/forum.js')
         ->css(__DIR__.'/less/forum.less')
-        // The queue, for everyone who may decide.
-        ->route('/applicants', 'gatehouse.applicants'),
+        /*
+         * The queue, for everyone who may decide. 🚨 Not /applicants: realtime
+         * setups proxy `location /app` (no slash) to the websocket server, and
+         * nginx prefix-matches /applicants into it, a bare 404.
+         */
+        ->route('/gatehouse', 'gatehouse.applicants'),
 
     (new Extend\Frontend('admin'))
         ->js(__DIR__.'/js/dist/admin.js')
