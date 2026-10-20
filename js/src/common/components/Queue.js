@@ -82,7 +82,7 @@ export default class Queue extends Component {
               <li className="GatehouseQueue-row" key={row.id}>
                 <div className="GatehouseQueue-who">
                   <strong>{row.displayName}</strong>
-                  <span className="GatehouseQueue-username">@{row.username}</span>
+                  {row.username !== row.displayName ? <span className="GatehouseQueue-username">@{row.username}</span> : null}
                   {row.email ? <span className="GatehouseQueue-email">{row.email}</span> : null}
                   {row.reason ? (
                     <blockquote className="GatehouseQueue-reason" title={t('answer')}>
