@@ -21,13 +21,28 @@ export default class Queue extends Component {
     this.load();
   }
 
-  load() {
-    this.rows = null;
-    app.request({ method: 'GET', url: app.forum.attribute('apiUrl') + '/gatehouse/queue', params: { status: this.tab } }).then((r) => {
-      this.rows = r.applicants;
-      this.setPending(r.counts.pending);
-      m.redraw();
-    });
+  // A page at a time. Deciding removes a row from this tab's list, so the rows
+  // already shown are exactly the offset of the next page.
+  load(more = false) {
+    const tab = this.tab;
+    if (more) this.loadingMore = true;
+    else this.rows = null;
+    app
+      .request({
+        method: 'GET',
+        url: app.forum.attribute('apiUrl') + '/gatehouse/queue',
+        params: { status: tab, offset: more ? this.rows.length : 0 },
+      })
+      .then((r) => {
+        if (tab !== this.tab) return;
+        this.rows = more ? this.rows.concat(r.applicants) : r.applicants;
+        this.hasMore = r.hasMore;
+        this.setPending(r.counts.pending);
+      })
+      .finally(() => {
+        this.loadingMore = false;
+        m.redraw();
+      });
   }
 
   // Keeps the forum's badge in step with the queue.
@@ -127,6 +142,14 @@ export default class Queue extends Component {
             ))}
           </ul>
         )}
+
+        {this.rows && this.hasMore ? (
+          <div className="GatehouseQueue-more">
+            <Button className="Button" loading={this.loadingMore} onclick={() => this.load(true)}>
+              {t('load_more')}
+            </Button>
+          </div>
+        ) : null}
       </div>
     );
   }

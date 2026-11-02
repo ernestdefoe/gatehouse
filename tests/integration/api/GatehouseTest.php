@@ -3,6 +3,7 @@
 namespace Ernestdefoe\Gatehouse\Tests\integration\api;
 
 use Carbon\Carbon;
+use Ernestdefoe\Gatehouse\Api\QueueController;
 use Flarum\Extend;
 use Flarum\Testing\integration\RetrievesAuthorizedUsers;
 use Flarum\Testing\integration\TestCase;
@@ -61,6 +62,28 @@ class GatehouseTest extends TestCase
         $this->assertSame(200, $status);
         $this->assertSame(['alsowaiting', 'waiting'], array_column($body['applicants'], 'username'), 'The newest applicant first');
         $this->assertSame(['pending' => 2], $body['counts']);
+    }
+
+    #[Test]
+    public function the_queue_pages_so_older_applicants_stay_reachable()
+    {
+        $rows = [];
+        for ($i = 0; $i < QueueController::PAGE + 5; $i++) {
+            $rows[] = ['id' => 100 + $i, 'username' => "applicant$i", 'email' => "applicant$i@machine.local", 'is_email_confirmed' => 0,
+                'joined_at' => Carbon::parse('2020-01-01')->addMinutes($i), 'gatehouse_status' => 'pending'];
+        }
+        $this->prepareDatabase([User::class => $rows]);
+
+        [, $first] = $this->json('GET', '/api/gatehouse/queue', 1);
+        $this->assertCount(QueueController::PAGE, $first['applicants']);
+        $this->assertTrue($first['hasMore']);
+        $this->assertSame(QueueController::PAGE + 7, $first['counts']['pending']);
+
+        [, $rest] = $this->json('GET', '/api/gatehouse/queue', 1, [], ['offset' => (string) QueueController::PAGE]);
+        $this->assertCount(7, $rest['applicants'], 'The rest, ending with the oldest');
+        $this->assertFalse($rest['hasMore']);
+        $this->assertSame('applicant0', end($rest['applicants'])['username']);
+        $this->assertEmpty(array_intersect(array_column($first['applicants'], 'id'), array_column($rest['applicants'], 'id')));
     }
 
     #[Test]
@@ -161,6 +184,9 @@ class GatehouseTest extends TestCase
         $this->assertNull($status('student'), 'A subdomain of an allowed domain');
         $this->assertSame('pending', $status('stranger'));
         $this->assertSame('pending', $status('lookalike'), 'Not a look-alike domain');
+        $tokens = fn (string $username) => $this->database()->table('email_tokens')->where('user_id', $this->database()->table('users')->where('username', $username)->value('id'))->count();
+        $this->assertSame(1, $tokens('student'), 'Walks in: gets the activation link now');
+        $this->assertSame(0, $tokens('stranger'), 'Waits: the activation link comes with the approval');
         $this->assertSame(2, $this->database()->table('notifications')->where('user_id', 1)->where('type', 'gatehouseApplicant')->count(), 'The admin is told');
     }
 

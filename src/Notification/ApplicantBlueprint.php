@@ -52,6 +52,8 @@ class ApplicantBlueprint implements BlueprintInterface, AlertableInterface, Mail
 
     public function getEmailSubject(TranslatorInterface $translator): string
     {
+        // Not constructor-injected on purpose: blueprints are built with `new` and
+        // serialized into the queued mail job, which a settings repository cannot be.
         return $translator->trans('ernestdefoe-gatehouse.email.admin_new.subject', [
             'applicant' => $this->applicant->display_name,
             'forum' => resolve('flarum.settings')->get('forum_title'),
