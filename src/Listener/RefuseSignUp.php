@@ -6,6 +6,7 @@ use Ernestdefoe\Gatehouse\Rules;
 use Flarum\Foundation\ValidationException;
 use Flarum\Locale\TranslatorInterface;
 use Flarum\User\Event\Saving;
+use Flarum\User\User;
 use Illuminate\Support\Arr;
 
 /**
@@ -27,49 +28,66 @@ class RefuseSignUp
             return;
         }
 
-        /*
-         * 🚨 Renames too, not only sign-up. Otherwise anybody can register as
-         * "dave" and become "admin" next week, which is the very thing a
-         * reserved list exists to stop.
-         */
-        $username = Arr::get($event->data, 'attributes.username');
+        $this->checkUsername($event->user, Arr::get($event->data, 'attributes.username'));
 
-        if ($username !== null
-            && (! $event->user->exists || mb_strtolower((string) $username) !== mb_strtolower((string) $event->user->getOriginal('username')))
-            && $this->rules->reservesUsername((string) $username)) {
-            throw new ValidationException([
-                'username' => $this->translator->trans('ernestdefoe-gatehouse.lib.username_reserved'),
-            ]);
-        }
-
-        /*
-         * 🚨 A change of address too, not only sign-up. Otherwise anybody can
-         * register with a clean address and switch to a refused one after.
-         */
         $email = $event->user->exists
             ? (string) Arr::get($event->data, 'attributes.email')
             : (string) (Arr::get($event->data, 'attributes.email') ?? $event->user->email);
 
-        if ($email !== ''
-            && (! $event->user->exists || mb_strtolower($email) !== mb_strtolower((string) $event->user->getOriginal('email')))
-            && $this->rules->refuses($email)) {
-            throw new ValidationException([
-                'email' => $this->translator->trans('ernestdefoe-gatehouse.lib.refused'),
-            ]);
+        $this->checkEmail($event->user, $email);
+
+        if (! $event->user->exists) {
+            $this->checkAnswer($email, (string) Arr::get($event->data, 'attributes.gatehouseReason'), $event->actor);
+        }
+    }
+
+    /**
+     * 🚨 Renames too, not only sign-up. Otherwise anybody can register as
+     * "dave" and become "admin" next week, which is the very thing a
+     * reserved list exists to stop.
+     */
+    private function checkUsername(User $user, mixed $username): void
+    {
+        if ($username === null || ! $this->changes($user, 'username', (string) $username)) {
+            return;
         }
 
-        /*
-         * The sign-up question, when the admin made it required. Only for an
-         * address that will wait: a trusted address walks straight in, so
-         * nobody reads the answer and it is never demanded.
-         */
-        if (! $event->user->exists
-            && $this->rules->questionRequired()
-            && trim((string) Arr::get($event->data, 'attributes.gatehouseReason')) === ''
-            && $this->rules->holds($email, $event->actor)) {
-            throw new ValidationException([
-                'gatehouseReason' => $this->translator->trans('ernestdefoe-gatehouse.lib.reason_required'),
-            ]);
+        if ($this->rules->reservesUsername((string) $username)) {
+            $this->refuse('username', 'username_reserved');
         }
+    }
+
+    /**
+     * 🚨 A change of address too, not only sign-up. Otherwise anybody can
+     * register with a clean address and switch to a refused one after.
+     */
+    private function checkEmail(User $user, string $email): void
+    {
+        if ($email !== '' && $this->changes($user, 'email', $email) && $this->rules->refuses($email)) {
+            $this->refuse('email', 'refused');
+        }
+    }
+
+    /**
+     * The sign-up question, when the admin made it required. Only for an
+     * address that will wait: a trusted address walks straight in, so
+     * nobody reads the answer and it is never demanded.
+     */
+    private function checkAnswer(string $email, string $answer, User $actor): void
+    {
+        if ($this->rules->questionRequired() && trim($answer) === '' && $this->rules->holds($email, $actor)) {
+            $this->refuse('gatehouseReason', 'reason_required');
+        }
+    }
+
+    /** A new account, or a value other than the one it has (case aside). */
+    private function changes(User $user, string $attribute, string $value): bool
+    {
+        return ! $user->exists || mb_strtolower($value) !== mb_strtolower((string) $user->getOriginal($attribute));
+    }
+
+    private function refuse(string $field, string $key): never
+    {
+        throw new ValidationException([$field => $this->translator->trans('ernestdefoe-gatehouse.lib.'.$key)]);
     }
 }

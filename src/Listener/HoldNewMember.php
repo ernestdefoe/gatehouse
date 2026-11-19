@@ -2,11 +2,15 @@
 
 namespace Ernestdefoe\Gatehouse\Listener;
 
+use Carbon\Carbon;
+use Ernestdefoe\Gatehouse\Applicant;
 use Ernestdefoe\Gatehouse\Deciders;
 use Ernestdefoe\Gatehouse\Mailer;
 use Ernestdefoe\Gatehouse\Notification\ApplicantBlueprint;
+use Ernestdefoe\Gatehouse\PendingCount;
 use Ernestdefoe\Gatehouse\Rules;
 use Flarum\Notification\NotificationSyncer;
+use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\Event\Registered;
 use Flarum\User\User;
 use Psr\Log\LoggerInterface;
@@ -18,6 +22,8 @@ class HoldNewMember
         private Rules $rules,
         private Mailer $mailer,
         private NotificationSyncer $notifications,
+        private PendingCount $pending,
+        private SettingsRepositoryInterface $settings,
         private LoggerInterface $log,
     ) {
     }
@@ -35,8 +41,15 @@ class HoldNewMember
      */
     public function hold(User $user, bool $tellApplicant = true): void
     {
-        $user->setAttribute('gatehouse_status', 'pending');
-        $user->save();
+        // The row may already hold their answer to the sign-up question (UserResourceFields).
+        $applicant = $user->getRelationValue('gatehouseApplicant') ?? new Applicant();
+        $applicant->user_id = $user->id;
+        $applicant->status = 'pending';
+        $applicant->held_at = Carbon::now();
+        $applicant->save();
+
+        $user->setRelation('gatehouseApplicant', $applicant);
+        $this->pending->forget();
 
         /*
          * 🚨 Everything after the status is best-effort. The hold is what
@@ -49,7 +62,10 @@ class HoldNewMember
             }
 
             // An alert and an email to everyone who may decide, as each one's notification settings allow.
-            $this->notifications->sync(new ApplicantBlueprint($user), Deciders::query()->get()->all());
+            $this->notifications->sync(
+                new ApplicantBlueprint($user, $applicant->reason, (string) $this->settings->get('forum_title')),
+                Deciders::query()->get()->all()
+            );
         } catch (\Throwable $e) {
             $this->log->warning('[gatehouse] held '.$user->id.' but could not send every notice: '.$e->getMessage());
         }

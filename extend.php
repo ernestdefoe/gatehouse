@@ -4,21 +4,23 @@
  * Gatehouse — approve new members before they get in.
  */
 
-use Ernestdefoe\Gatehouse\Api\DecideController;
-use Ernestdefoe\Gatehouse\Api\QueueController;
+use Ernestdefoe\Gatehouse\Access\ApplicantPolicy;
+use Ernestdefoe\Gatehouse\Access\ScopeApplicantVisibility;
+use Ernestdefoe\Gatehouse\Api\ForumResourceFields;
+use Ernestdefoe\Gatehouse\Api\Resource\ApplicantResource;
+use Ernestdefoe\Gatehouse\Api\UserResourceFields;
+use Ernestdefoe\Gatehouse\Applicant;
 use Ernestdefoe\Gatehouse\BlockSignIn;
-use Ernestdefoe\Gatehouse\Deciders;
+use Ernestdefoe\Gatehouse\Listener\RemoveFromQueue;
 use Ernestdefoe\Gatehouse\Listener\HoldNewMember;
 use Ernestdefoe\Gatehouse\Listener\HoldOnEmailChange;
 use Ernestdefoe\Gatehouse\Listener\RefuseSignUp;
 use Ernestdefoe\Gatehouse\Notification\ApplicantBlueprint;
-use Ernestdefoe\Gatehouse\Rules;
-use Flarum\Api\Context;
 use Flarum\Api\Resource\ForumResource;
 use Flarum\Api\Resource\UserResource;
-use Flarum\Api\Schema;
 use Flarum\Extend;
 use Flarum\Group\Group;
+use Flarum\User\Event\Deleted;
 use Flarum\User\Event\EmailChangeRequested;
 use Flarum\User\Event\Registered;
 use Flarum\User\Event\Saving;
@@ -54,7 +56,8 @@ return [
     (new Extend\Event())
         ->listen(Registered::class, HoldNewMember::class)
         ->listen(EmailChangeRequested::class, HoldOnEmailChange::class)
-        ->listen(Saving::class, RefuseSignUp::class),
+        ->listen(Saving::class, RefuseSignUp::class)
+        ->listen(Deleted::class, RemoveFromQueue::class),
 
     (new Extend\Auth())
         ->addPasswordChecker('gatehouse', BlockSignIn::class),
@@ -66,56 +69,39 @@ return [
      * waiting or declined, a member has exactly a guest's permissions — they
      * can read what a visitor can, and do nothing a visitor cannot.
      */
+    (new Extend\Model(User::class))
+        ->hasOne('gatehouseApplicant', Applicant::class, 'user_id'),
+
+    /*
+     * 🚨 The real lock. Sign-up logs the new member straight in, and a
+     * confirmation link can be requested again from the forum, so neither the
+     * login check nor holding back the email can be the whole of it. While
+     * waiting or declined, a member has exactly a guest's permissions — they
+     * can read what a visitor can, and do nothing a visitor cannot.
+     *
+     * Core already gives an unconfirmed account only the guest group, so the
+     * applicant row is looked up (once a request) only for confirmed members.
+     */
     (new Extend\User())
-        ->permissionGroups(function (User $actor, array $groupIds) {
-            return in_array($actor->getAttribute('gatehouse_status'), ['pending', 'declined'], true)
-                ? [Group::GUEST_ID]
-                : $groupIds;
-        }),
+        ->permissionGroups(fn (User $actor, array $groupIds) => $groupIds !== [Group::GUEST_ID] && Applicant::locksOut($actor)
+            ? [Group::GUEST_ID]
+            : $groupIds),
 
     (new Extend\Notification())
         ->type(ApplicantBlueprint::class, ['alert', 'email']),
 
+    // The queue, as a JSON:API resource, for those who may decide (ScopeApplicantVisibility).
+    new Extend\ApiResource(ApplicantResource::class),
+
+    (new Extend\ModelVisibility(Applicant::class))
+        ->scope(ScopeApplicantVisibility::class),
+
+    (new Extend\Policy())
+        ->modelPolicy(Applicant::class, ApplicantPolicy::class),
+
     (new Extend\ApiResource(ForumResource::class))
-        ->fields(fn () => [
-            // The signed-in member's own standing, so the forum can say "you're in the queue".
-            Schema\Str::make('gatehouseStatus')
-                ->get(fn ($model, Context $context) => in_array($context->getActor()->getAttribute('gatehouse_status'), ['pending', 'declined'], true)
-                    ? $context->getActor()->getAttribute('gatehouse_status')
-                    : null),
-            /*
-             * How many are waiting, and so whether to show the queue at all: only
-             * for those who may decide. Everyone else's permissions are already
-             * loaded for the page, so this costs them nothing; a decider pays one
-             * count on an indexed column.
-             */
-            Schema\Integer::make('gatehousePending')
-                ->visible(fn ($model, Context $context) => $context->getActor()->hasPermission(Deciders::PERMISSION))
-                ->get(fn () => User::query()->where('gatehouse_status', 'pending')->count()),
-            // The sign-up form's extra question, only while sign-ups are being held.
-            Schema\Str::make('gatehouseQuestion')
-                ->get(fn () => resolve(Rules::class)->question()),
-            Schema\Boolean::make('gatehouseQuestionRequired')
-                ->get(fn () => resolve(Rules::class)->questionRequired()),
-        ]),
+        ->fields(ForumResourceFields::class),
 
     (new Extend\ApiResource(UserResource::class))
-        ->fields(fn () => [
-            /*
-             * The applicant's answer: written once, at sign-up, and read only by
-             * those who may decide, and only while the applicant is waiting or declined.
-             */
-            Schema\Str::make('gatehouseReason')
-                ->visible(fn (User $user, Context $context) => $context->getActor()->hasPermission(Deciders::PERMISSION)
-                    && in_array($user->getAttribute('gatehouse_status'), ['pending', 'declined'], true))
-                ->writable(fn (User $user, Context $context) => $context->creating())
-                ->nullable()
-                ->maxLength(Rules::REASON_MAX)
-                ->get(fn (User $user) => $user->getAttribute('gatehouse_reason'))
-                ->set(fn (User $user, ?string $value) => $user->setAttribute('gatehouse_reason', trim((string) $value) ?: null)),
-        ]),
-
-    (new Extend\Routes('api'))
-        ->get('/gatehouse/queue', 'gatehouse.queue', QueueController::class)
-        ->post('/gatehouse/applicants/{id}/{decision:approve|decline}', 'gatehouse.decide', DecideController::class),
+        ->fields(UserResourceFields::class),
 ];

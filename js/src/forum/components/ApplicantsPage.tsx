@@ -4,14 +4,14 @@ import PageStructure from 'flarum/forum/components/PageStructure';
 import IndexSidebar from 'flarum/forum/components/IndexSidebar';
 import Queue from '../../common/components/Queue';
 
-const t = (key) => app.translator.trans(`ernestdefoe-gatehouse.forum.applicants.${key}`);
+const t = (key: string) => app.translator.trans(`ernestdefoe-gatehouse.forum.applicants.${key}`);
 
 /** /gatehouse: the queue, for everyone who may approve and decline. */
 export default class ApplicantsPage extends Page {
-  oninit(vnode) {
+  oninit(vnode: any) {
     super.oninit(vnode);
-    app.setTitle(t('title'));
-    app.history.push('gatehouse.applicants', t('title'));
+    app.setTitle(t('title') as string);
+    app.history.push('gatehouse.applicants', t('title') as string);
   }
 
   view() {

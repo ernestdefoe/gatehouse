@@ -3,7 +3,7 @@
 namespace Ernestdefoe\Gatehouse\Tests\integration\api;
 
 use Carbon\Carbon;
-use Ernestdefoe\Gatehouse\Api\QueueController;
+use Ernestdefoe\Gatehouse\Api\Resource\ApplicantResource;
 use Flarum\Extend;
 use Flarum\Testing\integration\RetrievesAuthorizedUsers;
 use Flarum\Testing\integration\TestCase;
@@ -22,19 +22,28 @@ class GatehouseTest extends TestCase
         $this->extension('ernestdefoe-gatehouse');
         $this->extend((new Extend\Csrf())->exemptRoute('login')->exemptRoute('users.create'));
 
-        $user = fn (int $id, string $name, ?string $status, array $extra = []) => $extra + [
+        $user = fn (int $id, string $name, array $extra = []) => $extra + [
             'id' => $id, 'username' => $name, 'email' => "$name@machine.local", 'password' => '$2y$10$LO59tiT7uggl6Oe23o/O6.utnF6ipngYjvMvaxo1TciKqBttDNKim', // too-obscure
-            'is_email_confirmed' => 1, 'joined_at' => Carbon::now()->subDays(10 - $id), 'gatehouse_status' => $status,
+            'is_email_confirmed' => 1, 'joined_at' => Carbon::now()->subDays(10 - $id),
+        ];
+        $applicant = fn (int $id, string $status, array $extra = []) => $extra + [
+            'user_id' => $id, 'status' => $status, 'held_at' => Carbon::now()->subDays(10 - $id),
         ];
 
         $this->prepareDatabase([
             User::class => [
                 $this->normalUser(),
-                $user(3, 'waiting', 'pending'),
-                $user(4, 'refused', 'declined', ['gatehouse_decided_at' => Carbon::now()->subDay(), 'gatehouse_decided_by' => 1]),
-                $user(5, 'welcomed', 'approved', ['gatehouse_decided_at' => Carbon::now(), 'gatehouse_decided_by' => 1]),
-                $user(6, 'alsowaiting', 'pending'),
-                $user(7, 'unconfirmed', null, ['is_email_confirmed' => 0]),
+                $user(3, 'waiting'),
+                $user(4, 'refused'),
+                $user(5, 'welcomed'),
+                $user(6, 'alsowaiting'),
+                $user(7, 'unconfirmed', ['is_email_confirmed' => 0]),
+            ],
+            'gatehouse_applicants' => [
+                $applicant(3, 'pending'),
+                $applicant(4, 'declined', ['decided_at' => Carbon::now()->subDay(), 'decided_by' => 1]),
+                $applicant(5, 'approved', ['decided_at' => Carbon::now(), 'decided_by' => 1]),
+                $applicant(6, 'pending'),
             ],
         ]);
     }
@@ -49,85 +58,101 @@ class GatehouseTest extends TestCase
 
     private function gatehouseStatus(int $user): ?string
     {
-        return $this->database()->table('users')->where('id', $user)->value('gatehouse_status');
+        return $this->database()->table('gatehouse_applicants')->where('user_id', $user)->value('status');
+    }
+
+    /** The queue for one status: [HTTP status, usernames, the whole body]. */
+    private function queue(?int $actor, ?string $status = null, int $offset = 0): array
+    {
+        $query = array_filter(['filter' => $status ? ['status' => $status] : null, 'page' => $offset ? ['offset' => (string) $offset] : null]);
+        [$code, $body] = $this->json('GET', '/api/gatehouse-applicants', $actor, [], $query);
+
+        return [$code, array_map(fn ($row) => $row['attributes']['username'], $body['data'] ?? []), $body];
+    }
+
+    /** Approve or decline: the HTTP status. */
+    private function decide(int $applicant, string $decision, ?int $actor): int
+    {
+        return $this->json('PATCH', "/api/gatehouse-applicants/$applicant", $actor, ['data' => [
+            'type' => 'gatehouse-applicants', 'id' => (string) $applicant, 'attributes' => ['status' => $decision === 'approve' ? 'approved' : 'declined'],
+        ]])[0];
     }
 
     #[Test]
     public function the_queue_is_for_admins_and_whoever_may_decide()
     {
-        $this->assertSame(403, $this->json('GET', '/api/gatehouse/queue', null)[0]);
-        $this->assertSame(403, $this->json('GET', '/api/gatehouse/queue', 2)[0]);
+        $this->assertSame(403, $this->queue(null)[0]);
+        $this->assertSame(403, $this->queue(2)[0]);
 
-        [$status, $body] = $this->json('GET', '/api/gatehouse/queue', 1);
+        [$status, $names, $body] = $this->queue(1);
         $this->assertSame(200, $status);
-        $this->assertSame(['alsowaiting', 'waiting'], array_column($body['applicants'], 'username'), 'The newest applicant first');
-        $this->assertSame(['pending' => 2], $body['counts']);
+        $this->assertSame(['alsowaiting', 'waiting'], $names, 'The newest applicant first');
+        $this->assertSame(2, $body['meta']['page']['total']);
     }
 
     #[Test]
     public function the_queue_pages_so_older_applicants_stay_reachable()
     {
         $rows = [];
-        for ($i = 0; $i < QueueController::PAGE + 5; $i++) {
-            $rows[] = ['id' => 100 + $i, 'username' => "applicant$i", 'email' => "applicant$i@machine.local", 'is_email_confirmed' => 0,
-                'joined_at' => Carbon::parse('2020-01-01')->addMinutes($i), 'gatehouse_status' => 'pending'];
+        for ($i = 0; $i < ApplicantResource::PAGE + 5; $i++) {
+            $rows[] = ['id' => 100 + $i, 'username' => "applicant$i", 'email' => "applicant$i@machine.local", 'is_email_confirmed' => 0];
+            $held[] = ['user_id' => 100 + $i, 'status' => 'pending', 'held_at' => Carbon::parse('2020-01-01')->addMinutes($i)];
         }
-        $this->prepareDatabase([User::class => $rows]);
+        $this->prepareDatabase([User::class => $rows, 'gatehouse_applicants' => $held]);
 
-        [, $first] = $this->json('GET', '/api/gatehouse/queue', 1);
-        $this->assertCount(QueueController::PAGE, $first['applicants']);
-        $this->assertTrue($first['hasMore']);
-        $this->assertSame(QueueController::PAGE + 7, $first['counts']['pending']);
+        [, $first, $firstBody] = $this->queue(1);
+        $this->assertCount(ApplicantResource::PAGE, $first);
+        $this->assertArrayHasKey('next', $firstBody['links']);
+        $this->assertSame(ApplicantResource::PAGE + 7, $firstBody['meta']['page']['total']);
 
-        [, $rest] = $this->json('GET', '/api/gatehouse/queue', 1, [], ['offset' => (string) QueueController::PAGE]);
-        $this->assertCount(7, $rest['applicants'], 'The rest, ending with the oldest');
-        $this->assertFalse($rest['hasMore']);
-        $this->assertSame('applicant0', end($rest['applicants'])['username']);
-        $this->assertEmpty(array_intersect(array_column($first['applicants'], 'id'), array_column($rest['applicants'], 'id')));
+        [, $rest, $restBody] = $this->queue(1, null, ApplicantResource::PAGE);
+        $this->assertCount(7, $rest, 'The rest, ending with the oldest');
+        $this->assertArrayNotHasKey('next', $restBody['links'] ?? []);
+        $this->assertSame('applicant0', end($rest));
+        $this->assertEmpty(array_intersect($first, $rest));
     }
 
     #[Test]
     public function the_queue_lists_decided_applicants_with_who_decided()
     {
-        [, $declined] = $this->json('GET', '/api/gatehouse/queue', 1, [], ['status' => 'declined']);
-        $this->assertSame(['refused'], array_column($declined['applicants'], 'username'));
-        $this->assertSame('admin', $declined['applicants'][0]['decidedBy']);
+        [, $declined, $body] = $this->queue(1, 'declined');
+        $this->assertSame(['refused'], $declined);
+        $this->assertSame('admin', $body['data'][0]['attributes']['decidedBy']);
 
-        [, $other] = $this->json('GET', '/api/gatehouse/queue', 1, [], ['status' => 'everyone']);
-        $this->assertSame(['alsowaiting', 'waiting'], array_column($other['applicants'], 'username'), 'An unknown status reads as pending');
+        $this->assertSame(['alsowaiting', 'waiting'], $this->queue(1, 'everyone')[1], 'An unknown status reads as pending');
     }
 
     #[Test]
     public function only_an_admin_decides_and_only_on_an_applicant()
     {
-        $this->assertSame(403, $this->json('POST', '/api/gatehouse/applicants/3/approve', 2)[0]);
+        $this->assertSame(404, $this->decide(3, 'approve', 2), 'An applicant is not even visible to a member');
         $this->assertSame('pending', $this->gatehouseStatus(3));
 
-        $this->assertSame(409, $this->json('POST', '/api/gatehouse/applicants/2/decline', 1)[0], 'Not a way to lock out an ordinary member');
+        $this->assertSame(404, $this->decide(2, 'decline', 1), 'Not a way to lock out an ordinary member: they have no place in the queue');
         $this->assertNull($this->gatehouseStatus(2));
-        $this->assertSame(404, $this->json('POST', '/api/gatehouse/applicants/999/approve', 1)[0]);
+        $this->assertSame(403, $this->decide(5, 'decline', 1), 'Nor an approved one');
+        $this->assertSame('approved', $this->gatehouseStatus(5));
+        $this->assertSame(422, $this->json('PATCH', '/api/gatehouse-applicants/3', 1, ['data' => ['type' => 'gatehouse-applicants', 'id' => '3', 'attributes' => ['status' => 'pending']]])[0]);
     }
 
     #[Test]
     public function approving_lets_an_applicant_in_and_records_who_did_it()
     {
-        [$status, $body] = $this->json('POST', '/api/gatehouse/applicants/3/approve', 1);
+        $this->assertSame(200, $this->decide(3, 'approve', 1));
 
-        $this->assertSame(200, $status);
-        $this->assertSame(['status' => 'approved'], $body);
-        $row = $this->database()->table('users')->where('id', 3)->first();
-        $this->assertSame('approved', $row->gatehouse_status);
-        $this->assertEquals(1, $row->gatehouse_decided_by);
-        $this->assertNotNull($row->gatehouse_decided_at);
+        $row = $this->database()->table('gatehouse_applicants')->where('user_id', 3)->first();
+        $this->assertSame('approved', $row->status);
+        $this->assertEquals(1, $row->decided_by);
+        $this->assertNotNull($row->decided_at);
     }
 
     #[Test]
     public function a_declined_applicant_can_still_be_approved_later()
     {
-        $this->json('POST', '/api/gatehouse/applicants/3/decline', 1);
+        $this->decide(3, 'decline', 1);
         $this->assertSame('declined', $this->gatehouseStatus(3));
 
-        $this->assertSame(200, $this->json('POST', '/api/gatehouse/applicants/4/approve', 1)[0]);
+        $this->assertSame(200, $this->decide(4, 'approve', 1));
         $this->assertSame('approved', $this->gatehouseStatus(4));
     }
 
@@ -180,7 +205,7 @@ class GatehouseTest extends TestCase
         $this->assertSame(201, $this->register('stranger', 'kim@notuni.test')->getStatusCode());
         $this->assertSame(201, $this->register('lookalike', 'kim@baduni.test')->getStatusCode());
 
-        $status = fn (string $username) => $this->database()->table('users')->where('username', $username)->value('gatehouse_status');
+        $status = fn (string $username) => $this->gatehouseStatus((int) $this->database()->table('users')->where('username', $username)->value('id'));
         $this->assertNull($status('student'), 'A subdomain of an allowed domain');
         $this->assertSame('pending', $status('stranger'));
         $this->assertSame('pending', $status('lookalike'), 'Not a look-alike domain');
@@ -195,7 +220,7 @@ class GatehouseTest extends TestCase
     {
         $this->assertSame(201, $this->register('stranger', 'kim@notuni.test')->getStatusCode());
 
-        $this->assertNull($this->database()->table('users')->where('username', 'stranger')->value('gatehouse_status'));
+        $this->assertSame(0, $this->database()->table('gatehouse_applicants')->count() - 4, 'Nobody added to the queue');
     }
 
     #[Test]
@@ -276,13 +301,19 @@ class GatehouseTest extends TestCase
         $id = json_decode((string) $response->getBody(), true)['data']['id'];
         $this->assertArrayNotHasKey('gatehouseReason', json_decode((string) $response->getBody(), true)['data']['attributes'], 'Not echoed to a guest');
 
-        $this->assertSame("I study here.\nCS101", $this->database()->table('users')->where('id', $id)->value('gatehouse_reason'));
+        $this->assertSame("I study here.\nCS101", $this->database()->table('gatehouse_applicants')->where('user_id', $id)->value('reason'));
+        $this->assertSame('pending', $this->gatehouseStatus((int) $id));
 
-        [, $queue] = $this->json('GET', '/api/gatehouse/queue', 1);
-        $this->assertSame("I study here.\nCS101", $queue['applicants'][0]['reason']);
+        [, , $queue] = $this->queue(1);
+        $this->assertSame("I study here.\nCS101", $queue['data'][0]['attributes']['reason']);
 
-        $this->assertSame("I study here.\nCS101", $this->json('GET', "/api/users/$id", 1)[1]['data']['attributes']['gatehouseReason'] ?? null);
-        $this->assertArrayNotHasKey('gatehouseReason', $this->json('GET', "/api/users/$id", 2)[1]['data']['attributes'] ?? [], 'Not to an ordinary member');
+        $alert = $this->json('GET', '/api/notifications', 1)[1]['data'][0]['attributes'];
+        $this->assertSame(['reason' => "I study here.\nCS101"], $alert['content'], 'In the alert of whoever decides');
+
+        $this->assertArrayNotHasKey('gatehouseReason', $this->json('GET', "/api/users/$id", 1)[1]['data']['attributes'] ?? [], 'Never sent out on the member');
+
+        $this->assertSame(200, $this->decide((int) $id, 'approve', 1));
+        $this->assertSame(0, $this->database()->table('notifications')->where('type', 'gatehouseApplicant')->where('is_deleted', 0)->count(), 'The alert carrying the answer is cleared too');
 
         $this->assertSame(422, $this->register('essay', 'e@notuni.test', ['gatehouseReason' => str_repeat('x', 1001)])->getStatusCode());
     }
@@ -293,7 +324,7 @@ class GatehouseTest extends TestCase
         $this->json('PATCH', '/api/users/3', 3, ['data' => ['type' => 'users', 'id' => '3', 'attributes' => ['gatehouseReason' => 'changed']]]);
         $this->json('PATCH', '/api/users/3', 1, ['data' => ['type' => 'users', 'id' => '3', 'attributes' => ['gatehouseReason' => 'changed']]]);
 
-        $this->assertNull($this->database()->table('users')->where('id', 3)->value('gatehouse_reason'), 'Not by the applicant, not by an admin');
+        $this->assertNull($this->database()->table('gatehouse_applicants')->where('user_id', 3)->value('reason'), 'Not by the applicant, not by an admin');
     }
 
     #[Test]
@@ -365,21 +396,22 @@ class GatehouseTest extends TestCase
     {
         $this->moderatorWhoDecides();
 
-        [$status, $body] = $this->json('GET', '/api/gatehouse/queue', 10);
+        [$status, $names, $body] = $this->queue(10);
         $this->assertSame(200, $status);
-        $this->assertSame(['alsowaiting', 'waiting'], array_column($body['applicants'], 'username'));
-        $this->assertSame('waiting@machine.local', $body['applicants'][1]['email'], 'The address, to decide with');
+        $this->assertSame(['alsowaiting', 'waiting'], $names);
+        $this->assertSame('waiting@machine.local', $body['data'][1]['attributes']['email'], 'The address, to decide with');
 
-        $this->assertSame(200, $this->json('POST', '/api/gatehouse/applicants/3/approve', 10)[0]);
+        $this->assertSame(200, $this->decide(3, 'approve', 10));
         $this->assertSame('approved', $this->gatehouseStatus(3));
-        $this->assertEquals(10, $this->database()->table('users')->where('id', 3)->value('gatehouse_decided_by'));
+        $this->assertEquals(10, $this->database()->table('gatehouse_applicants')->where('user_id', 3)->value('decided_by'));
 
-        $this->assertSame(200, $this->json('POST', '/api/gatehouse/applicants/6/decline', 10)[0]);
+        $this->assertSame(200, $this->decide(6, 'decline', 10));
         $this->assertSame('declined', $this->gatehouseStatus(6));
 
-        [, $approved] = $this->json('GET', '/api/gatehouse/queue', 10, [], ['status' => 'approved']);
-        $this->assertSame('gatekeeper', array_column($approved['applicants'], 'decidedBy', 'username')['waiting']);
-        $this->assertSame([null], array_unique(array_column($approved['applicants'], 'email')), 'An approved member is a member: their address is for admins');
+        [, , $approved] = $this->queue(10, 'approved');
+        $rows = array_column(array_column($approved['data'], 'attributes'), null, 'username');
+        $this->assertSame('gatekeeper', $rows['waiting']['decidedBy']);
+        $this->assertSame([], array_filter(array_column($rows, 'email')), 'An approved member is a member: their address is for admins');
     }
 
     #[Test]
@@ -387,10 +419,11 @@ class GatehouseTest extends TestCase
     {
         $this->moderatorWhoDecides();
 
-        $this->assertSame(403, $this->json('GET', '/api/gatehouse/queue', 2)[0]);
-        $this->assertSame(403, $this->json('POST', '/api/gatehouse/applicants/3/approve', 2)[0]);
-        $this->assertSame(403, $this->json('POST', '/api/gatehouse/applicants/3/decline', 2)[0]);
-        $this->assertSame(403, $this->json('GET', '/api/gatehouse/queue', null)[0]);
+        $this->assertSame(403, $this->queue(2)[0]);
+        $this->assertSame(404, $this->decide(3, 'approve', 2));
+        $this->assertSame(404, $this->decide(3, 'decline', 2));
+        $this->assertSame(403, $this->queue(null)[0]);
+        $this->assertNotSame(200, $this->decide(3, 'approve', null), 'Nor a visitor');
         $this->assertSame('pending', $this->gatehouseStatus(3));
 
         $forum = fn (?int $actor) => $this->json('GET', '/api', $actor)[1]['data']['attributes'];
@@ -399,8 +432,13 @@ class GatehouseTest extends TestCase
         $this->assertSame(2, $forum(10)['gatehousePending']);
         $this->assertSame(2, $forum(1)['gatehousePending']);
 
-        $this->assertArrayNotHasKey('gatehouseReason', $this->json('GET', '/api/users/3', 2)[1]['data']['attributes']);
-        $this->assertArrayHasKey('gatehouseReason', $this->json('GET', '/api/users/3', 10)[1]['data']['attributes']);
+        // Cached, and forgotten whenever the queue changes.
+        $this->decide(3, 'approve', 10);
+        $this->assertSame(1, $forum(10)['gatehousePending'], 'A decision');
+        $this->send($this->request('DELETE', '/api/users/6', ['authenticatedAs' => 1]));
+        $this->assertNull($this->gatehouseStatus(6), 'Their place in the queue goes with them');
+        $this->assertSame(0, $forum(1)['gatehousePending'], 'A deleted applicant');
+
     }
 
     #[Test]
@@ -409,10 +447,10 @@ class GatehouseTest extends TestCase
         $this->moderatorWhoDecides();
         $this->prepareDatabase(['group_user' => [['user_id' => 6, 'group_id' => 1]]]);
 
-        $this->assertSame(409, $this->json('POST', '/api/gatehouse/applicants/2/decline', 10)[0], 'A confirmed member is not an applicant');
+        $this->assertSame(404, $this->decide(2, 'decline', 10), 'A confirmed member is not an applicant');
         $this->assertNull($this->gatehouseStatus(2));
 
-        $this->assertSame(403, $this->json('POST', '/api/gatehouse/applicants/6/decline', 10)[0], 'A waiting admin is an admin\'s call');
+        $this->assertSame(403, $this->decide(6, 'decline', 10), 'A waiting admin is an admin\'s call');
         $this->assertSame('pending', $this->gatehouseStatus(6));
     }
 
@@ -434,7 +472,7 @@ class GatehouseTest extends TestCase
         $this->assertSame([1, 10], $told);
 
         $applicant = (int) $this->database()->table('users')->where('username', 'stranger')->value('id');
-        $this->json('POST', "/api/gatehouse/applicants/$applicant/approve", 10);
+        $this->decide($applicant, 'approve', 10);
         $this->assertSame(0, $this->database()->table('notifications')->where('type', 'gatehouseApplicant')->where('is_deleted', 0)->count(), 'Deciding clears it for everyone');
     }
 }

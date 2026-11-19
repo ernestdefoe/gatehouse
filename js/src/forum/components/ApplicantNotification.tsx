@@ -12,11 +12,13 @@ export default class ApplicantNotification extends Notification {
   }
 
   content() {
-    return app.translator.trans('ernestdefoe-gatehouse.forum.notification', { name: this.attrs.notification.fromUser()?.displayName() });
+    const applicant = this.attrs.notification.fromUser();
+
+    return app.translator.trans('ernestdefoe-gatehouse.forum.notification', { name: applicant ? applicant.displayName() : '' });
   }
 
-  // Their answer to the sign-up question, when there is one.
+  // Their answer to the sign-up question, when there is one (it travels in the notification).
   excerpt() {
-    return this.attrs.notification.fromUser()?.attribute('gatehouseReason') || null;
+    return this.attrs.notification.content<{ reason?: string } | null>()?.reason || null;
   }
 }

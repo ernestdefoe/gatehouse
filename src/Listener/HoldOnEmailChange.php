@@ -2,6 +2,7 @@
 
 namespace Ernestdefoe\Gatehouse\Listener;
 
+use Ernestdefoe\Gatehouse\Applicant;
 use Ernestdefoe\Gatehouse\Rules;
 use Flarum\User\Event\EmailChangeRequested;
 
@@ -30,7 +31,7 @@ class HoldOnEmailChange
     {
         $user = $event->user;
 
-        if ($user->is_email_confirmed || $user->getAttribute('gatehouse_status') !== null || $user->isAdmin()) {
+        if ($user->is_email_confirmed || Applicant::statusOf($user) !== null || $user->isAdmin()) {
             return;
         }
 

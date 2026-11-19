@@ -1,4 +1,4 @@
-@php($reason = $blueprint->applicant->getAttribute('gatehouse_reason'))
+@php($reason = $blueprint->reason)
 @php($question = trim((string) $settings->get('ernestdefoe-gatehouse.question')))
 <x-mail::html.notification>
     <x-slot:body>

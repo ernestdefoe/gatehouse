@@ -56,7 +56,7 @@ class Rules
     /** The question the sign-up form asks, or null when it asks none. */
     public function question(): ?string
     {
-        $question = trim((string) $this->settings->get('ernestdefoe-gatehouse.question', ''));
+        $question = trim((string) $this->settings->get('ernestdefoe-gatehouse.question'));
 
         return $this->enabled() && $question !== '' ? $question : null;
     }
@@ -113,7 +113,7 @@ class Rules
     /** @return string[] */
     public function patterns(string $list): array
     {
-        $raw = (string) $this->settings->get('ernestdefoe-gatehouse.'.$list, '');
+        $raw = (string) $this->settings->get('ernestdefoe-gatehouse.'.$list);
         $lines = preg_split('/\R/', $raw) ?: [];
 
         return array_values(array_filter(array_map('trim', $lines), fn ($l) => $l !== '' && $l[0] !== '#'));

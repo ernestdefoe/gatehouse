@@ -58,7 +58,7 @@ class Mailer
 
     private function custom(string $key): string
     {
-        return trim((string) $this->settings->get('ernestdefoe-gatehouse.'.$key, ''));
+        return trim((string) $this->settings->get('ernestdefoe-gatehouse.'.$key));
     }
 
     private function send(User $to, string $kind, array $params): void

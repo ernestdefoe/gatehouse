@@ -4,13 +4,15 @@ import Notices from 'flarum/forum/components/Notices';
 import Alert from 'flarum/common/components/Alert';
 import Stream from 'flarum/common/utils/Stream';
 import LinkButton from 'flarum/common/components/LinkButton';
-import ApplicantNotification from './components/ApplicantNotification';
-import ApplicantsPage from './components/ApplicantsPage';
+import type ItemList from 'flarum/common/utils/ItemList';
+import type Mithril from 'mithril';
 
-// Present only for those who may approve and decline (see extend.php).
-const pending = () => app.forum.attribute('gatehousePending');
+export { default as extend } from './extend';
 
-const queueLink = (count) => (
+// Present only for those who may approve and decline (see ForumResourceFields).
+const pending = () => app.forum.attribute<number | undefined>('gatehousePending');
+
+const queueLink = (count: number | undefined) => (
   <LinkButton icon="fas fa-dungeon" href={app.route('gatehouse.applicants')}>
     {app.translator.trans('ernestdefoe-gatehouse.forum.applicants.link')}
     {count ? <span className="GatehouseQueue-count">{count}</span> : null}
@@ -18,26 +20,17 @@ const queueLink = (count) => (
 );
 
 app.initializers.add('ernestdefoe-gatehouse', () => {
-  app.notificationComponents.gatehouseApplicant = ApplicantNotification;
-
-  /*
-   * Bundled, not lazy: measured, webpack's chunk loader (~4 KB) costs every
-   * visitor more than the page itself does (forum.js 2.23 KB gz bundled vs
-   * 2.59 KB gz with the page split out).
-   */
-  app.routes['gatehouse.applicants'] = { path: '/gatehouse', component: ApplicantsPage };
-
-  extend('flarum/forum/components/SessionDropdown', 'items', function (items) {
+  extend('flarum/forum/components/SessionDropdown', 'items', function (items: ItemList<Mithril.Children>) {
     if (pending() != null) items.add('gatehouseApplicants', queueLink(pending()), 60);
   });
 
   // In the sidebar only while somebody is waiting.
-  extend('flarum/forum/components/IndexSidebar', 'navItems', function (items) {
+  extend('flarum/forum/components/IndexSidebar', 'navItems', function (items: ItemList<Mithril.Children>) {
     if (pending()) items.add('gatehouseApplicants', queueLink(pending()), 85);
   });
 
   // Whoever decides chooses how they hear about applicants, like any other notification.
-  extend('flarum/forum/components/NotificationGrid', 'notificationTypes', function (items) {
+  extend('flarum/forum/components/NotificationGrid', 'notificationTypes', function (items: ItemList<any>) {
     if (pending() == null) return;
 
     items.add('gatehouseApplicant', {
@@ -52,15 +45,15 @@ app.initializers.add('ernestdefoe-gatehouse', () => {
    * answer goes to whoever decides; the server says whether it is required,
    * since only it knows which addresses will wait.
    */
-  extend('flarum/forum/components/SignUpModal', 'oninit', function () {
+  extend('flarum/forum/components/SignUpModal', 'oninit', function (this: any) {
     this.gatehouseReason = Stream('');
   });
 
-  extend('flarum/forum/components/SignUpModal', 'fields', function (items) {
-    const question = app.forum.attribute('gatehouseQuestion');
+  extend('flarum/forum/components/SignUpModal', 'fields', function (this: any, items: ItemList<Mithril.Children>) {
+    const question = app.forum.attribute<string | null>('gatehouseQuestion');
     if (!question) return;
 
-    const required = app.forum.attribute('gatehouseQuestionRequired');
+    const required = app.forum.attribute<boolean>('gatehouseQuestionRequired');
 
     items.add(
       'gatehouseReason',
@@ -83,7 +76,7 @@ app.initializers.add('ernestdefoe-gatehouse', () => {
     );
   });
 
-  extend('flarum/forum/components/SignUpModal', 'submitData', function (data) {
+  extend('flarum/forum/components/SignUpModal', 'submitData', function (this: any, data: Record<string, unknown>) {
     if (app.forum.attribute('gatehouseQuestion')) data.gatehouseReason = this.gatehouseReason();
   });
 
@@ -92,8 +85,8 @@ app.initializers.add('ernestdefoe-gatehouse', () => {
    * place of core's "confirm your email / resend" notice. That notice would
    * offer them the activation link Gatehouse is deliberately holding back.
    */
-  extend(Notices.prototype, 'items', function (items) {
-    const status = app.forum.attribute('gatehouseStatus');
+  extend(Notices.prototype, 'items', function (items: ItemList<Mithril.Children>) {
+    const status = app.forum.attribute<string | null>('gatehouseStatus');
     if (!status) return;
 
     if (items.has('emailConfirmation')) items.remove('emailConfirmation');

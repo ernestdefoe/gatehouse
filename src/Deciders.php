@@ -35,6 +35,6 @@ class Deciders
                     ->from('group_permission')
                     ->where('permission', self::PERMISSION)
                     ->whereNotIn('group_id', [Group::GUEST_ID, Group::MEMBER_ID]))))
-            ->where(fn ($q) => $q->whereNull('gatehouse_status')->orWhere('gatehouse_status', 'approved'));
+            ->whereDoesntHave('gatehouseApplicant', fn ($applicant) => $applicant->whereIn('status', Applicant::LOCKED_OUT));
     }
 }

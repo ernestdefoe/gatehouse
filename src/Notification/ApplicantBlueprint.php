@@ -10,14 +10,24 @@ use Flarum\Notification\MailableInterface;
 use Flarum\User\User;
 
 /**
- * "Somebody is waiting to be let in", to every admin: an alert, and an email.
- * Both are ordinary notification types, so each admin turns either off in
- * their own notification settings, and the email carries an unsubscribe link.
+ * "Somebody is waiting to be let in", to everyone who may decide: an alert, and an email.
+ * Both are ordinary notification types, so each one turns either off in their
+ * own notification settings, and the email carries an unsubscribe link.
+ *
+ * The applicant's answer travels in the notification's data, so the alert can
+ * show it without a lookup per notification. Only those who decide receive it.
  */
 class ApplicantBlueprint implements BlueprintInterface, AlertableInterface, MailableInterface
 {
-    public function __construct(public User $applicant)
-    {
+    /**
+     * Plain values, not services: blueprints are built with `new` and serialized
+     * into the queued mail job. The forum title is only needed for the email.
+     */
+    public function __construct(
+        public User $applicant,
+        public ?string $reason = null,
+        public string $forumTitle = '',
+    ) {
     }
 
     public function getFromUser(): ?User
@@ -32,7 +42,7 @@ class ApplicantBlueprint implements BlueprintInterface, AlertableInterface, Mail
 
     public function getData(): mixed
     {
-        return null;
+        return $this->reason !== null ? ['reason' => $this->reason] : null;
     }
 
     public static function getType(): string
@@ -52,11 +62,9 @@ class ApplicantBlueprint implements BlueprintInterface, AlertableInterface, Mail
 
     public function getEmailSubject(TranslatorInterface $translator): string
     {
-        // Not constructor-injected on purpose: blueprints are built with `new` and
-        // serialized into the queued mail job, which a settings repository cannot be.
         return $translator->trans('ernestdefoe-gatehouse.email.admin_new.subject', [
             'applicant' => $this->applicant->display_name,
-            'forum' => resolve('flarum.settings')->get('forum_title'),
+            'forum' => $this->forumTitle,
         ]);
     }
 }

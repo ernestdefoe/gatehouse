@@ -22,9 +22,9 @@ class BlockSignIn
 
     public function __invoke(User $user, string $password): ?bool
     {
-        $status = $user->getAttribute('gatehouse_status');
+        $status = Applicant::statusOf($user);
 
-        if (! in_array($status, ['pending', 'declined'], true)) {
+        if (! in_array($status, Applicant::LOCKED_OUT, true)) {
             return null; // No opinion: core decides.
         }
 
