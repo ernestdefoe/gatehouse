@@ -2,13 +2,15 @@
 
 namespace Ernestdefoe\Gatehouse\Tests\integration\api;
 
+use Flarum\Extension\ExtensionManager;
 use Flarum\Testing\integration\TestCase;
 use Illuminate\Database\Schema\Blueprint;
 use PHPUnit\Framework\Attributes\Test;
 
 /**
  * Forums from before 1.5 kept the queue on `users`. The move copies it into
- * gatehouse_applicants and takes the columns off `users`.
+ * gatehouse_applicants and takes the columns off `users`; a purge then leaves
+ * `users` as it found it.
  *
  * Schema changes inside the test: MySQL commits DDL at once, which would leak
  * into the other tests, so this runs on SQLite and PostgreSQL, whose schema
@@ -65,5 +67,24 @@ class MoveOffUsersTest extends TestCase
         foreach (['gatehouse_status', 'gatehouse_decided_at', 'gatehouse_decided_by', 'gatehouse_reason'] as $column) {
             $this->assertFalse($schema->hasColumn('users', $column), "users.$column is gone");
         }
+    }
+
+    #[Test]
+    public function a_purge_leaves_nothing_behind()
+    {
+        $manager = $this->app()->getContainer()->make(ExtensionManager::class);
+        $db = $this->database();
+
+        if ($db->getDriverName() === 'mysql' || $db->getDriverName() === 'mariadb') {
+            $this->markTestSkipped('MySQL commits schema changes at once.');
+        }
+
+        // What Admin → Extensions → Purge runs: every Gatehouse migration down, newest first.
+        $manager->migrateDown($manager->getExtension('ernestdefoe-gatehouse'));
+
+        $schema = $db->getSchemaBuilder();
+        $this->assertFalse($schema->hasTable('gatehouse_applicants'));
+        $this->assertSame([], array_values(array_filter($schema->getColumnListing('users'), fn ($column) => str_starts_with($column, 'gatehouse_'))));
+        $this->assertSame(0, $db->table('migrations')->where('extension', 'ernestdefoe-gatehouse')->count(), 'Every migration rolled back');
     }
 }
