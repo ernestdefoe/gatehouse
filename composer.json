@@ -27,6 +27,9 @@
         "php": "^8.3",
         "flarum/core": "^2.0"
     },
+    "conflict": {
+        "ernestdefoe/trust-levels": "<1.0.2"
+    },
     "autoload": {
         "psr-4": {
             "Ernestdefoe\\Gatehouse\\": "src/"

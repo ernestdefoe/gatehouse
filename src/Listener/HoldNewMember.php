@@ -40,6 +40,9 @@ class HoldNewMember
     /**
      * Put a member in the queue and tell whoever decides. The applicant is told too,
      * unless the address on the account may not be theirs (see HoldOnEmailChange).
+     *
+     * Public API: other extensions (Trust Levels) send a member back to the queue
+     * through this method, so its signature stays stable.
      */
     public function hold(User $user, bool $tellApplicant = true): void
     {
