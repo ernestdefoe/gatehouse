@@ -11,13 +11,13 @@ use Illuminate\Contracts\Cache\Repository;
  *
  * The permission lock asks on every request a signed-in member makes, so the
  * answer is cached per member. It changes only through Gatehouse itself (a
- * hold, a decision, a deleted member), and each of those forgets it.
+ * hold, a decision, a deleted member), and each of those calls changed().
  */
 class Standing
 {
     private const TTL = 86400;
 
-    public function __construct(private Repository $cache)
+    public function __construct(private Repository $cache, private PendingCount $pending)
     {
     }
 
@@ -42,9 +42,11 @@ class Standing
         return Applicant::locksOutStatus($this->of($user));
     }
 
-    public function forget(int $userId): void
+    /** A member's place in the queue changed: forget their standing and the waiting count. */
+    public function changed(int $userId): void
     {
         $this->cache->forget($this->key($userId));
+        $this->pending->forget();
     }
 
     private function key(int $userId): string

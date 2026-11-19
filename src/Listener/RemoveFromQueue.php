@@ -3,7 +3,6 @@
 namespace Ernestdefoe\Gatehouse\Listener;
 
 use Ernestdefoe\Gatehouse\Applicant;
-use Ernestdefoe\Gatehouse\PendingCount;
 use Ernestdefoe\Gatehouse\Standing;
 use Flarum\User\Event\Deleted;
 
@@ -14,14 +13,13 @@ use Flarum\User\Event\Deleted;
  */
 class RemoveFromQueue
 {
-    public function __construct(private PendingCount $pending, private Standing $standing)
+    public function __construct(private Standing $standing)
     {
     }
 
     public function handle(Deleted $event): void
     {
         Applicant::query()->where('user_id', $event->user->id)->delete();
-        $this->pending->forget();
-        $this->standing->forget($event->user->id);
+        $this->standing->changed($event->user->id);
     }
 }
