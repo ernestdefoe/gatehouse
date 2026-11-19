@@ -9,6 +9,7 @@ use Ernestdefoe\Gatehouse\Mailer;
 use Ernestdefoe\Gatehouse\Notification\ApplicantBlueprint;
 use Ernestdefoe\Gatehouse\PendingCount;
 use Ernestdefoe\Gatehouse\Rules;
+use Ernestdefoe\Gatehouse\Standing;
 use Flarum\Notification\NotificationSyncer;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\Event\Registered;
@@ -23,6 +24,7 @@ class HoldNewMember
         private Mailer $mailer,
         private NotificationSyncer $notifications,
         private PendingCount $pending,
+        private Standing $standing,
         private SettingsRepositoryInterface $settings,
         private LoggerInterface $log,
     ) {
@@ -50,6 +52,7 @@ class HoldNewMember
 
         $user->setRelation('gatehouseApplicant', $applicant);
         $this->pending->forget();
+        $this->standing->forget($user->id);
 
         /*
          * 🚨 Everything after the status is best-effort. The hold is what

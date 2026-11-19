@@ -4,6 +4,8 @@ import Button from 'flarum/common/components/Button';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
 import humanTime from 'flarum/common/helpers/humanTime';
 import type Applicant from '../models/Applicant';
+import canDecide from '../canDecide';
+import type Mithril from 'mithril';
 
 type Tab = 'pending' | 'declined' | 'approved';
 type Decision = 'approved' | 'declined';
@@ -23,7 +25,7 @@ export default class Queue extends Component {
   pending = 0;
   busy: Record<string, Decision> = {};
 
-  oninit(vnode: any) {
+  oninit(vnode: Mithril.Vnode) {
     super.oninit(vnode);
     this.pending = app.forum.attribute<number>('gatehousePending') || 0;
     this.load();
@@ -57,7 +59,7 @@ export default class Queue extends Component {
   // Keeps the forum's badge in step with the queue.
   setPending(count: number) {
     this.pending = count;
-    if (app.forum.attribute('gatehousePending') != null) app.forum.pushAttributes({ gatehousePending: count });
+    if (canDecide()) app.forum.pushAttributes({ gatehousePending: count });
   }
 
   decide(row: Applicant, decision: Decision) {

@@ -16,7 +16,7 @@ class ApplicantPolicy extends AbstractPolicy
         }
 
         // Only someone waiting or declined can be decided on: an approved member is an ordinary member now.
-        if (! in_array($applicant->status, Applicant::LOCKED_OUT, true)) {
+        if (! $applicant->isLockedOut()) {
             return $this->deny();
         }
 

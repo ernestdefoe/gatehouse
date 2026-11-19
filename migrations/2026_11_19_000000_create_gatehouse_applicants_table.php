@@ -44,6 +44,8 @@ return [
             $db->table('users')
                 ->leftJoin('users as deciders', 'deciders.id', '=', 'users.gatehouse_decided_by')
                 ->whereNotNull('users.gatehouse_status')
+                // Rows a half-finished earlier run already copied.
+                ->whereNotIn('users.id', $db->table('gatehouse_applicants')->select('user_id'))
                 ->select(array_values($copy))
         );
 

@@ -5,11 +5,16 @@ import Alert from 'flarum/common/components/Alert';
 import Stream from 'flarum/common/utils/Stream';
 import LinkButton from 'flarum/common/components/LinkButton';
 import type ItemList from 'flarum/common/utils/ItemList';
+import type SignUpModal from 'flarum/forum/components/SignUpModal';
+import type NotificationGrid from 'flarum/forum/components/NotificationGrid';
 import type Mithril from 'mithril';
+import canDecide from '../common/canDecide';
 
 export { default as extend } from './extend';
 
-// Present only for those who may approve and decline (see ForumResourceFields).
+type NotificationType = ReturnType<NotificationGrid['notificationTypes']> extends ItemList<infer T> ? T : never;
+type GatehouseSignUp = SignUpModal & { gatehouseReason: Stream<string> };
+
 const pending = () => app.forum.attribute<number | undefined>('gatehousePending');
 
 const queueLink = (count: number | undefined) => (
@@ -21,7 +26,7 @@ const queueLink = (count: number | undefined) => (
 
 app.initializers.add('ernestdefoe-gatehouse', () => {
   extend('flarum/forum/components/SessionDropdown', 'items', function (items: ItemList<Mithril.Children>) {
-    if (pending() != null) items.add('gatehouseApplicants', queueLink(pending()), 60);
+    if (canDecide()) items.add('gatehouseApplicants', queueLink(pending()), 60);
   });
 
   // In the sidebar only while somebody is waiting.
@@ -30,8 +35,8 @@ app.initializers.add('ernestdefoe-gatehouse', () => {
   });
 
   // Whoever decides chooses how they hear about applicants, like any other notification.
-  extend('flarum/forum/components/NotificationGrid', 'notificationTypes', function (items: ItemList<any>) {
-    if (pending() == null) return;
+  extend('flarum/forum/components/NotificationGrid', 'notificationTypes', function (items: ItemList<NotificationType>) {
+    if (!canDecide()) return;
 
     items.add('gatehouseApplicant', {
       name: 'gatehouseApplicant',
@@ -45,11 +50,11 @@ app.initializers.add('ernestdefoe-gatehouse', () => {
    * answer goes to whoever decides; the server says whether it is required,
    * since only it knows which addresses will wait.
    */
-  extend('flarum/forum/components/SignUpModal', 'oninit', function (this: any) {
+  extend<GatehouseSignUp, 'oninit'>('flarum/forum/components/SignUpModal', 'oninit', function (this: GatehouseSignUp) {
     this.gatehouseReason = Stream('');
   });
 
-  extend('flarum/forum/components/SignUpModal', 'fields', function (this: any, items: ItemList<Mithril.Children>) {
+  extend<GatehouseSignUp, 'fields'>('flarum/forum/components/SignUpModal', 'fields', function (this: GatehouseSignUp, items: ItemList<unknown>) {
     const question = app.forum.attribute<string | null>('gatehouseQuestion');
     if (!question) return;
 
@@ -67,18 +72,23 @@ app.initializers.add('ernestdefoe-gatehouse', () => {
           className="FormControl"
           name="gatehouseReason"
           rows="3"
-          maxlength="1000"
+          maxlength={app.forum.attribute<number>('gatehouseReasonMax')}
           bidi={this.gatehouseReason}
-          disabled={this.loading}
+          // `loading` is protected on Modal, so it is read through a cast here.
+          disabled={(this as unknown as { loading: boolean }).loading}
         />
       </div>,
       5
     );
   });
 
-  extend('flarum/forum/components/SignUpModal', 'submitData', function (this: any, data: Record<string, unknown>) {
-    if (app.forum.attribute('gatehouseQuestion')) data.gatehouseReason = this.gatehouseReason();
-  });
+  extend<GatehouseSignUp, 'submitData'>(
+    'flarum/forum/components/SignUpModal',
+    'submitData',
+    function (this: GatehouseSignUp, data: Record<string, unknown>) {
+      if (app.forum.attribute('gatehouseQuestion')) data.gatehouseReason = this.gatehouseReason();
+    }
+  );
 
   /*
    * A member waiting for approval sees why they can't do anything yet, in

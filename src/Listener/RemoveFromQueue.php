@@ -4,15 +4,17 @@ namespace Ernestdefoe\Gatehouse\Listener;
 
 use Ernestdefoe\Gatehouse\Applicant;
 use Ernestdefoe\Gatehouse\PendingCount;
+use Ernestdefoe\Gatehouse\Standing;
 use Flarum\User\Event\Deleted;
 
 /**
- * A deleted member leaves the queue. The key cascades on MySQL and PostgreSQL,
- * but SQLite does not enforce foreign keys, so the row is removed here too.
+ * A deleted member leaves the queue. The foreign key already cascades; the row
+ * is removed here too so nothing lingers on a database running with foreign
+ * keys off, and the cached count and standing are forgotten.
  */
 class RemoveFromQueue
 {
-    public function __construct(private PendingCount $pending)
+    public function __construct(private PendingCount $pending, private Standing $standing)
     {
     }
 
@@ -20,5 +22,6 @@ class RemoveFromQueue
     {
         Applicant::query()->where('user_id', $event->user->id)->delete();
         $this->pending->forget();
+        $this->standing->forget($event->user->id);
     }
 }

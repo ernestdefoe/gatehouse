@@ -169,6 +169,11 @@ class GatehouseTest extends TestCase
         $this->assertSame('pending', $forumStatus(3));
         $this->assertSame('declined', $forumStatus(4));
         $this->assertNull($forumStatus(5));
+
+        // The standing is cached per member, and a decision forgets it at once.
+        $this->decide(3, 'approve', 1);
+        $this->assertNull($forumStatus(3));
+        $this->assertSame(201, $start(3), 'Let in the moment they are approved');
     }
 
     private function login(string $identification, string $password): ResponseInterface
@@ -288,6 +293,7 @@ class GatehouseTest extends TestCase
         $forum = $this->json('GET', '/api', null)[1]['data']['attributes'];
         $this->assertSame('Why join?', $forum['gatehouseQuestion']);
         $this->assertTrue($forum['gatehouseQuestionRequired']);
+        $this->assertSame(1000, $forum['gatehouseReasonMax'], 'The form takes the server\'s limit');
     }
 
     #[Test]

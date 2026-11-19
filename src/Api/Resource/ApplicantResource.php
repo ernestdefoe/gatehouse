@@ -9,6 +9,7 @@ use Ernestdefoe\Gatehouse\Event\Approved;
 use Ernestdefoe\Gatehouse\Mailer;
 use Ernestdefoe\Gatehouse\Notification\ApplicantBlueprint;
 use Ernestdefoe\Gatehouse\PendingCount;
+use Ernestdefoe\Gatehouse\Standing;
 use Flarum\Api\Context;
 use Flarum\Api\Endpoint;
 use Flarum\Api\Resource\AbstractDatabaseResource;
@@ -36,6 +37,7 @@ class ApplicantResource extends AbstractDatabaseResource
         private Mailer $mailer,
         private NotificationSyncer $notifications,
         private PendingCount $pending,
+        private Standing $standing,
         private LoggerInterface $log,
     ) {
     }
@@ -121,6 +123,7 @@ class ApplicantResource extends AbstractDatabaseResource
     public function updated(object $model, OriginalContext $context): ?object
     {
         $this->pending->forget();
+        $this->standing->forget($model->user_id);
         $user = $model->user;
 
         if ($model->status === 'approved') {

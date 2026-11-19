@@ -5,6 +5,7 @@
  */
 
 use Ernestdefoe\Gatehouse\Access\ApplicantPolicy;
+use Ernestdefoe\Gatehouse\Access\LockOutApplicants;
 use Ernestdefoe\Gatehouse\Access\ScopeApplicantVisibility;
 use Ernestdefoe\Gatehouse\Api\ForumResourceFields;
 use Ernestdefoe\Gatehouse\Api\Resource\ApplicantResource;
@@ -19,7 +20,6 @@ use Ernestdefoe\Gatehouse\Notification\ApplicantBlueprint;
 use Flarum\Api\Resource\ForumResource;
 use Flarum\Api\Resource\UserResource;
 use Flarum\Extend;
-use Flarum\Group\Group;
 use Flarum\User\Event\Deleted;
 use Flarum\User\Event\EmailChangeRequested;
 use Flarum\User\Event\Registered;
@@ -62,30 +62,12 @@ return [
     (new Extend\Auth())
         ->addPasswordChecker('gatehouse', BlockSignIn::class),
 
-    /*
-     * 🚨 The real lock. Sign-up logs the new member straight in, and a
-     * confirmation link can be requested again from the forum, so neither the
-     * login check nor holding back the email can be the whole of it. While
-     * waiting or declined, a member has exactly a guest's permissions — they
-     * can read what a visitor can, and do nothing a visitor cannot.
-     */
     (new Extend\Model(User::class))
         ->hasOne('gatehouseApplicant', Applicant::class, 'user_id'),
 
-    /*
-     * 🚨 The real lock. Sign-up logs the new member straight in, and a
-     * confirmation link can be requested again from the forum, so neither the
-     * login check nor holding back the email can be the whole of it. While
-     * waiting or declined, a member has exactly a guest's permissions — they
-     * can read what a visitor can, and do nothing a visitor cannot.
-     *
-     * Core already gives an unconfirmed account only the guest group, so the
-     * applicant row is looked up (once a request) only for confirmed members.
-     */
+    // 🚨 The real lock: while waiting or declined, a member has a guest's permissions.
     (new Extend\User())
-        ->permissionGroups(fn (User $actor, array $groupIds) => $groupIds !== [Group::GUEST_ID] && Applicant::locksOut($actor)
-            ? [Group::GUEST_ID]
-            : $groupIds),
+        ->permissionGroups(LockOutApplicants::class),
 
     (new Extend\Notification())
         ->type(ApplicantBlueprint::class, ['alert', 'email']),

@@ -16,15 +16,15 @@ use Illuminate\Contracts\Hashing\Hasher;
  */
 class BlockSignIn
 {
-    public function __construct(private Hasher $hasher, private TranslatorInterface $translator)
+    public function __construct(private Hasher $hasher, private TranslatorInterface $translator, private Standing $standing)
     {
     }
 
     public function __invoke(User $user, string $password): ?bool
     {
-        $status = Applicant::statusOf($user);
+        $status = $this->standing->of($user);
 
-        if (! in_array($status, Applicant::LOCKED_OUT, true)) {
+        if (! Applicant::locksOutStatus($status)) {
             return null; // No opinion: core decides.
         }
 

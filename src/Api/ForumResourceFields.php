@@ -6,12 +6,13 @@ use Ernestdefoe\Gatehouse\Applicant;
 use Ernestdefoe\Gatehouse\Deciders;
 use Ernestdefoe\Gatehouse\PendingCount;
 use Ernestdefoe\Gatehouse\Rules;
+use Ernestdefoe\Gatehouse\Standing;
 use Flarum\Api\Context;
 use Flarum\Api\Schema;
 
 class ForumResourceFields
 {
-    public function __construct(private Rules $rules, private PendingCount $pending)
+    public function __construct(private Rules $rules, private PendingCount $pending, private Standing $standing)
     {
     }
 
@@ -20,7 +21,11 @@ class ForumResourceFields
         return [
             // The signed-in member's own standing, so the forum can say "you're in the queue".
             Schema\Str::make('gatehouseStatus')
-                ->get(fn ($forum, Context $context) => Applicant::locksOut($context->getActor()) ? Applicant::statusOf($context->getActor()) : null),
+                ->get(function ($forum, Context $context) {
+                    $status = $this->standing->of($context->getActor());
+
+                    return Applicant::locksOutStatus($status) ? $status : null;
+                }),
             // How many are waiting, and so whether to show the queue at all: only for those who may decide.
             Schema\Integer::make('gatehousePending')
                 ->visible(fn ($forum, Context $context) => $context->getActor()->hasPermission(Deciders::PERMISSION))
@@ -30,6 +35,10 @@ class ForumResourceFields
                 ->get(fn () => $this->rules->question()),
             Schema\Boolean::make('gatehouseQuestionRequired')
                 ->get(fn () => $this->rules->questionRequired()),
+            // The longest answer the server takes, for the form's own limit.
+            Schema\Integer::make('gatehouseReasonMax')
+                ->visible(fn () => $this->rules->question() !== null)
+                ->get(fn () => Rules::REASON_MAX),
         ];
     }
 }

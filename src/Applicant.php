@@ -43,15 +43,14 @@ class Applicant extends AbstractModel
         'decided_at' => 'datetime',
     ];
 
-    /** The member's standing: null for everybody Gatehouse never held. */
-    public static function statusOf(User $user): ?string
+    public static function locksOutStatus(?string $status): bool
     {
-        return $user->getRelationValue('gatehouseApplicant')?->status;
+        return in_array($status, self::LOCKED_OUT, true);
     }
 
-    public static function locksOut(User $user): bool
+    public function isLockedOut(): bool
     {
-        return in_array(self::statusOf($user), self::LOCKED_OUT, true);
+        return self::locksOutStatus($this->status);
     }
 
     public function user(): BelongsTo
